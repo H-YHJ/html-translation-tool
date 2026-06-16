@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Context Translator",
+  "version": "0.1.0",
+  "description": "Analyze page context before translating visible web content.",
+  "permissions": ["activeTab", "storage", "scripting"],
+  "host_permissions": [
+    "https://api.openai.com/*",
+    "https://*.openai.azure.com/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "action": {
+    "default_popup": "src/popup.html",
+    "default_title": "上下文翻译助手"
+  },
+  "options_page": "src/popup.html",
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["src/contentScript.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

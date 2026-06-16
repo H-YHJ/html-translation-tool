@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>上下文翻译助手</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="header">
+        <div>
+          <h1>上下文翻译</h1>
+          <p>先读页面，再翻译。</p>
+        </div>
+        <button class="icon-button" id="restorePage" title="恢复原文" type="button">原</button>
+      </header>
+
+      <section class="section">
+        <label for="targetLanguage">翻译为</label>
+        <select id="targetLanguage">
+          <option>中文（简体）</option>
+          <option>中文（繁体）</option>
+          <option>English</option>
+          <option>日本語</option>
+          <option>한국어</option>
+          <option>Deutsch</option>
+          <option>Français</option>
+          <option>Español</option>
+        </select>
+      </section>
+
+      <section class="section">
+        <label for="apiKey">API Key</label>
+        <input id="apiKey" type="password" autocomplete="off" placeholder="sk-...">
+      </section>
+
+      <section class="grid-2">
+        <div class="section">
+          <label for="model">模型</label>
+          <input id="model" type="text" autocomplete="off">
+        </div>
+        <div class="section">
+          <label for="endpoint">接口</label>
+          <input id="endpoint" type="url" autocomplete="off">
+        </div>
+      </section>
+
+      <section class="section">
+        <label for="glossary">术语偏好</label>
+        <textarea id="glossary" rows="3" placeholder="例如：prompt=提示词；fine-tuning=微调；Copilot 不翻译"></textarea>
+      </section>
+
+      <div class="actions">
+        <button id="saveSettings" class="secondary" type="button">保存设置</button>
+        <button id="translateSelection" class="secondary" type="button">翻译选中</button>
+        <button id="translatePage" class="primary" type="button">翻译页面</button>
+      </div>
+
+      <p class="status" id="status" role="status"></p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>
