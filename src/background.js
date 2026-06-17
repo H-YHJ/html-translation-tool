@@ -1,10 +1,43 @@
+const PROVIDERS = {
+  openai: {
+    endpoint: "https://api.openai.com/v1/chat/completions",
+    model: "gpt-4.1-mini"
+  },
+  deepseek: {
+    endpoint: "https://api.deepseek.com/chat/completions",
+    model: "deepseek-v4-pro"
+  },
+  aliyun: {
+    endpoint: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+    model: "qwen3.6-plus"
+  },
+  custom: {
+    endpoint: "",
+    model: ""
+  }
+};
+
 const DEFAULT_SETTINGS = {
+  provider: "deepseek",
   apiKey: "",
-  endpoint: "https://api.openai.com/v1/chat/completions",
-  model: "gpt-4.1-mini",
-  targetLanguage: "中文（简体）",
+  apiKeys: {
+    openai: "",
+    deepseek: "",
+    aliyun: "",
+    custom: ""
+  },
+  endpoint: PROVIDERS.deepseek.endpoint,
+  model: PROVIDERS.deepseek.model,
+  targetLanguage: "Simplified Chinese",
   glossary: "",
   temperature: 0.1
+};
+
+const LEGACY_MODEL_MIGRATIONS = {
+  aliyun: {
+    "qwen3.7-max": "qwen3.6-plus",
+    "qwen3.7max": "qwen3.6-plus"
+  }
 };
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -33,7 +66,26 @@ async function handleMessage(message) {
 
 async function getSettings() {
   const stored = await chrome.storage.local.get(DEFAULT_SETTINGS);
-  return { ...DEFAULT_SETTINGS, ...stored };
+  const provider = stored.provider || DEFAULT_SETTINGS.provider;
+  const preset = PROVIDERS[provider] || PROVIDERS.custom;
+  const apiKeys = { ...DEFAULT_SETTINGS.apiKeys, ...(stored.apiKeys || {}) };
+  const storedModel = stored.model || preset.model;
+  const model = migrateModel(provider, storedModel);
+
+  return {
+    ...DEFAULT_SETTINGS,
+    ...stored,
+    apiKeys,
+    provider,
+    apiKey: apiKeys[provider] || stored.apiKey || "",
+    endpoint: stored.endpoint || preset.endpoint,
+    model
+  };
+}
+
+function migrateModel(provider, model) {
+  const value = String(model || "").trim();
+  return LEGACY_MODEL_MIGRATIONS[provider]?.[value] || value;
 }
 
 async function translateBatch(payload) {
@@ -76,26 +128,32 @@ async function translateSelection(payload) {
 
 function ensureReady(settings) {
   if (!settings.apiKey || !settings.apiKey.trim()) {
-    throw new Error("请先在弹窗里填写 API Key。");
+    throw new Error(`请先填写 ${settings.provider} 的 API 密钥。`);
   }
 
   if (!settings.endpoint || !settings.endpoint.trim()) {
-    throw new Error("请先设置 Chat Completions API 地址。");
+    throw new Error("请先设置 Chat Completions 接口地址。");
+  }
+
+  if (!settings.model || !settings.model.trim()) {
+    throw new Error("请先设置模型名称。");
   }
 }
 
 async function callChatCompletion(settings, messages) {
+  const body = {
+    model: settings.model.trim(),
+    temperature: Number(settings.temperature) || DEFAULT_SETTINGS.temperature,
+    messages
+  };
+
   const response = await fetch(settings.endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${settings.apiKey.trim()}`
     },
-    body: JSON.stringify({
-      model: settings.model.trim() || DEFAULT_SETTINGS.model,
-      temperature: Number(settings.temperature) || DEFAULT_SETTINGS.temperature,
-      messages
-    })
+    body: JSON.stringify(body)
   });
 
   if (!response.ok) {

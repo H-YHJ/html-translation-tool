@@ -8,53 +8,114 @@
   </head>
   <body>
     <main class="shell">
-      <header class="header">
-        <div>
-          <h1>上下文翻译</h1>
-          <p>先读页面，再翻译。</p>
+      <header class="app-header">
+        <div class="brand">
+          <div class="logo-mark" aria-hidden="true">
+            <span>译</span>
+          </div>
+          <div>
+            <h1>上下文翻译助手</h1>
+            <p>先理解网页语境，再翻译正文。</p>
+          </div>
         </div>
-        <button class="icon-button" id="restorePage" title="恢复原文" type="button">原</button>
+        <button class="icon-button" id="restorePage" title="恢复原文" aria-label="恢复原文" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 7v6h6"></path>
+            <path d="M21 17a9 9 0 0 0-15-6.7L3 13"></path>
+          </svg>
+        </button>
       </header>
 
-      <section class="section">
-        <label for="targetLanguage">翻译为</label>
-        <select id="targetLanguage">
-          <option>中文（简体）</option>
-          <option>中文（繁体）</option>
-          <option>English</option>
-          <option>日本語</option>
-          <option>한국어</option>
-          <option>Deutsch</option>
-          <option>Français</option>
-          <option>Español</option>
-        </select>
-      </section>
-
-      <section class="section">
-        <label for="apiKey">API Key</label>
-        <input id="apiKey" type="password" autocomplete="off" placeholder="sk-...">
-      </section>
-
-      <section class="grid-2">
+      <section class="panel">
         <div class="section">
-          <label for="model">模型</label>
-          <input id="model" type="text" autocomplete="off">
+          <label for="provider">翻译服务</label>
+          <div class="select-shell">
+            <select id="provider">
+              <option value="deepseek">DeepSeek</option>
+              <option value="aliyun">阿里云百炼</option>
+              <option value="openai">OpenAI</option>
+              <option value="custom">自定义兼容接口</option>
+            </select>
+          </div>
         </div>
+
         <div class="section">
-          <label for="endpoint">接口</label>
-          <input id="endpoint" type="url" autocomplete="off">
+          <label for="targetLanguage">翻译为</label>
+          <div class="select-shell">
+            <select id="targetLanguage">
+              <option>简体中文</option>
+              <option>繁体中文</option>
+              <option>英语</option>
+              <option>日语</option>
+              <option>韩语</option>
+              <option>德语</option>
+              <option>法语</option>
+              <option>西班牙语</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="section">
+          <label id="apiKeyLabel" for="apiKey">API 密钥</label>
+          <div class="secret-field">
+            <input id="apiKey" type="password" autocomplete="off" placeholder="sk-...">
+            <button id="toggleApiKey" class="icon-button field-icon" type="button" aria-controls="apiKey" aria-pressed="false" aria-label="显示 API 密钥" title="显示 API 密钥">
+              <svg class="icon-eye" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+              <svg class="icon-eye-off" viewBox="0 0 24 24" aria-hidden="true" hidden>
+                <path d="M10.7 5.1A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a18.6 18.6 0 0 1-2.1 3.1"></path>
+                <path d="M14.1 14.1A3 3 0 0 1 9.9 9.9"></path>
+                <path d="M3 3l18 18"></path>
+                <path d="M6.4 6.4C3.6 8.3 2 12 2 12s3.5 7 10 7a10.8 10.8 0 0 0 4.2-.9"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="section">
+            <label for="model">模型</label>
+            <input id="model" type="text" autocomplete="off">
+          </div>
+          <div class="section">
+            <label for="endpoint">接口地址</label>
+            <input id="endpoint" type="url" autocomplete="off">
+          </div>
+        </div>
+
+        <div class="section">
+          <label for="glossary">术语偏好</label>
+          <textarea id="glossary" rows="3" placeholder="例如：prompt=提示词；fine-tuning=微调；Copilot 不翻译"></textarea>
         </div>
       </section>
 
-      <section class="section">
-        <label for="glossary">术语偏好</label>
-        <textarea id="glossary" rows="3" placeholder="例如：prompt=提示词；fine-tuning=微调；Copilot 不翻译"></textarea>
-      </section>
-
-      <div class="actions">
-        <button id="saveSettings" class="secondary" type="button">保存设置</button>
-        <button id="translateSelection" class="secondary" type="button">翻译选中</button>
-        <button id="translatePage" class="primary" type="button">翻译页面</button>
+      <div class="actions" aria-label="翻译操作">
+        <button id="saveSettings" class="secondary action-button" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 6 9 17l-5-5"></path>
+          </svg>
+          <span>保存</span>
+        </button>
+        <button id="translateSelection" class="secondary action-button" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 7h16"></path>
+            <path d="M8 12h8"></path>
+            <path d="M6 17h12"></path>
+          </svg>
+          <span>选中</span>
+        </button>
+        <button id="translatePage" class="primary action-button" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 8h8"></path>
+            <path d="M9 4v4c0 4-2 7-5 9"></path>
+            <path d="M7 13c1 2 3 3 6 4"></path>
+            <path d="M16 20l4-9 4 9"></path>
+            <path d="M18 16h4"></path>
+          </svg>
+          <span>翻译页面</span>
+        </button>
       </div>
 
       <p class="status" id="status" role="status"></p>

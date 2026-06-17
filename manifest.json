@@ -1,12 +1,16 @@
 {
   "manifest_version": 3,
-  "name": "Context Translator",
-  "version": "0.1.0",
-  "description": "Analyze page context before translating visible web content.",
+  "name": "上下文翻译助手",
+  "version": "0.2.0",
+  "description": "先分析网页语境，再生成更准确译文的网页翻译扩展。",
   "permissions": ["activeTab", "storage", "scripting"],
   "host_permissions": [
     "https://api.openai.com/*",
     "https://*.openai.azure.com/*",
+    "https://api.deepseek.com/*",
+    "https://dashscope.aliyuncs.com/*",
+    "https://dashscope-us.aliyuncs.com/*",
+    "https://*.maas.aliyuncs.com/*",
     "http://localhost/*",
     "http://127.0.0.1/*"
   ],

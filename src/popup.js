@@ -1,13 +1,64 @@
+const PROVIDERS = {
+  openai: {
+    label: "OpenAI",
+    endpoint: "https://api.openai.com/v1/chat/completions",
+    model: "gpt-4.1-mini"
+  },
+  deepseek: {
+    label: "DeepSeek",
+    endpoint: "https://api.deepseek.com/chat/completions",
+    model: "deepseek-v4-pro"
+  },
+  aliyun: {
+    label: "阿里云百炼",
+    endpoint: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+    model: "qwen3.6-plus"
+  },
+  custom: {
+    label: "自定义接口",
+    endpoint: "",
+    model: ""
+  }
+};
+
 const DEFAULT_SETTINGS = {
+  provider: "deepseek",
   apiKey: "",
-  endpoint: "https://api.openai.com/v1/chat/completions",
-  model: "gpt-4.1-mini",
-  targetLanguage: "中文（简体）",
+  apiKeys: {
+    openai: "",
+    deepseek: "",
+    aliyun: "",
+    custom: ""
+  },
+  endpoint: PROVIDERS.deepseek.endpoint,
+  model: PROVIDERS.deepseek.model,
+  targetLanguage: "简体中文",
   glossary: ""
 };
 
+const LEGACY_MODEL_MIGRATIONS = {
+  aliyun: {
+    "qwen3.7-max": "qwen3.6-plus",
+    "qwen3.7max": "qwen3.6-plus"
+  }
+};
+
+const LANGUAGE_MIGRATIONS = {
+  "Simplified Chinese": "简体中文",
+  "Traditional Chinese": "繁体中文",
+  English: "英语",
+  Japanese: "日语",
+  Korean: "韩语",
+  German: "德语",
+  French: "法语",
+  Spanish: "西班牙语"
+};
+
 const controls = {
+  provider: document.getElementById("provider"),
   apiKey: document.getElementById("apiKey"),
+  apiKeyLabel: document.getElementById("apiKeyLabel"),
+  toggleApiKey: document.getElementById("toggleApiKey"),
   endpoint: document.getElementById("endpoint"),
   model: document.getElementById("model"),
   targetLanguage: document.getElementById("targetLanguage"),
@@ -19,12 +70,27 @@ const controls = {
   restorePage: document.getElementById("restorePage")
 };
 
+let settingsCache = { ...DEFAULT_SETTINGS };
+let activeProvider = DEFAULT_SETTINGS.provider;
+
 document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
-  const settings = await chrome.storage.local.get(DEFAULT_SETTINGS);
-  setFormValues({ ...DEFAULT_SETTINGS, ...settings });
+  const stored = await chrome.storage.local.get(DEFAULT_SETTINGS);
+  settingsCache = normalizeSettings(stored);
+  activeProvider = settingsCache.provider;
 
+  if (
+    (stored.model && stored.model !== settingsCache.model) ||
+    (stored.targetLanguage && stored.targetLanguage !== settingsCache.targetLanguage)
+  ) {
+    await chrome.storage.local.set(settingsCache);
+  }
+
+  setFormValues(settingsCache);
+
+  controls.provider.addEventListener("change", handleProviderChange);
+  controls.toggleApiKey.addEventListener("click", toggleApiKeyVisibility);
   controls.saveSettings.addEventListener("click", saveSettings);
   controls.translatePage.addEventListener("click", () => runTabAction("TRANSLATE_PAGE"));
   controls.translateSelection.addEventListener("click", () => runTabAction("TRANSLATE_SELECTION"));
@@ -35,26 +101,118 @@ async function init() {
   }
 }
 
+function normalizeSettings(stored) {
+  const provider = stored.provider || DEFAULT_SETTINGS.provider;
+  const preset = PROVIDERS[provider] || PROVIDERS.custom;
+  const apiKeys = { ...DEFAULT_SETTINGS.apiKeys, ...(stored.apiKeys || {}) };
+  const storedModel = stored.model || preset.model;
+  const model = migrateModel(provider, storedModel);
+  const targetLanguage = migrateLanguage(stored.targetLanguage || DEFAULT_SETTINGS.targetLanguage);
+
+  if (stored.apiKey && !apiKeys[provider]) {
+    apiKeys[provider] = stored.apiKey;
+  }
+
+  return {
+    ...DEFAULT_SETTINGS,
+    ...stored,
+    apiKeys,
+    provider,
+    apiKey: apiKeys[provider] || "",
+    endpoint: stored.endpoint || preset.endpoint,
+    model,
+    targetLanguage
+  };
+}
+
+function migrateModel(provider, model) {
+  const value = String(model || "").trim();
+  return LEGACY_MODEL_MIGRATIONS[provider]?.[value] || value;
+}
+
+function migrateLanguage(language) {
+  const value = String(language || "").trim();
+  return LANGUAGE_MIGRATIONS[value] || value;
+}
+
 function setFormValues(settings) {
-  controls.apiKey.value = settings.apiKey || "";
-  controls.endpoint.value = settings.endpoint || DEFAULT_SETTINGS.endpoint;
-  controls.model.value = settings.model || DEFAULT_SETTINGS.model;
+  const provider = settings.provider || DEFAULT_SETTINGS.provider;
+  const preset = PROVIDERS[provider] || PROVIDERS.custom;
+
+  controls.provider.value = provider;
+  controls.apiKey.value = settings.apiKeys?.[provider] || settings.apiKey || "";
+  controls.apiKeyLabel.textContent = `${preset.label} API 密钥`;
+  setApiKeyVisibility(false);
+  controls.endpoint.value = settings.endpoint || preset.endpoint;
+  controls.model.value = settings.model || preset.model;
   controls.targetLanguage.value = settings.targetLanguage || DEFAULT_SETTINGS.targetLanguage;
   controls.glossary.value = settings.glossary || "";
 }
 
 function getFormValues() {
+  const provider = controls.provider.value;
+  const preset = PROVIDERS[provider] || PROVIDERS.custom;
+  const apiKeys = { ...DEFAULT_SETTINGS.apiKeys, ...(settingsCache.apiKeys || {}) };
+  const apiKey = controls.apiKey.value.trim();
+
+  apiKeys[provider] = apiKey;
+
   return {
-    apiKey: controls.apiKey.value.trim(),
-    endpoint: controls.endpoint.value.trim() || DEFAULT_SETTINGS.endpoint,
-    model: controls.model.value.trim() || DEFAULT_SETTINGS.model,
+    provider,
+    apiKey,
+    apiKeys,
+    endpoint: controls.endpoint.value.trim() || preset.endpoint,
+    model: controls.model.value.trim() || preset.model,
     targetLanguage: controls.targetLanguage.value,
     glossary: controls.glossary.value.trim()
   };
 }
 
+function handleProviderChange() {
+  const provider = controls.provider.value;
+  const preset = PROVIDERS[provider] || PROVIDERS.custom;
+  const apiKeys = { ...DEFAULT_SETTINGS.apiKeys, ...(settingsCache.apiKeys || {}) };
+
+  apiKeys[activeProvider] = controls.apiKey.value.trim();
+  activeProvider = provider;
+
+  settingsCache = {
+    ...settingsCache,
+    apiKeys,
+    provider,
+    apiKey: apiKeys[provider] || "",
+    endpoint: preset.endpoint || settingsCache.endpoint || "",
+    model: preset.model || settingsCache.model || "",
+    targetLanguage: controls.targetLanguage.value,
+    glossary: controls.glossary.value.trim()
+  };
+
+  controls.apiKey.value = apiKeys[provider] || "";
+  controls.apiKeyLabel.textContent = `${preset.label} API 密钥`;
+  setApiKeyVisibility(false);
+  controls.endpoint.value = preset.endpoint || settingsCache.endpoint || "";
+  controls.model.value = preset.model || settingsCache.model || "";
+
+  setStatus(`已切换到 ${preset.label}。`, "success");
+}
+
+function toggleApiKeyVisibility() {
+  setApiKeyVisibility(controls.apiKey.type === "password");
+}
+
+function setApiKeyVisibility(isVisible) {
+  controls.apiKey.type = isVisible ? "text" : "password";
+  controls.toggleApiKey.querySelector(".icon-eye").hidden = isVisible;
+  controls.toggleApiKey.querySelector(".icon-eye-off").hidden = !isVisible;
+  controls.toggleApiKey.title = isVisible ? "隐藏 API 密钥" : "显示 API 密钥";
+  controls.toggleApiKey.setAttribute("aria-label", isVisible ? "隐藏 API 密钥" : "显示 API 密钥");
+  controls.toggleApiKey.setAttribute("aria-pressed", String(isVisible));
+}
+
 async function saveSettings() {
-  await chrome.storage.local.set(getFormValues());
+  settingsCache = getFormValues();
+  activeProvider = settingsCache.provider;
+  await chrome.storage.local.set(settingsCache);
   setStatus("设置已保存。", "success");
 }
 
@@ -95,7 +253,7 @@ async function sendToActiveTab(message) {
   try {
     return await chrome.tabs.sendMessage(tab.id, message);
   } catch (error) {
-    throw new Error("这个页面不支持内容脚本，请换一个普通网页再试。");
+    throw new Error("这个页面不支持内容脚本，请换一个普通 http/https 网页再试。");
   }
 }
 

@@ -350,7 +350,7 @@
       .context-translator-panel {
         all: initial;
         box-sizing: border-box;
-        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
       }
 
       .context-translator-toast {
@@ -359,26 +359,27 @@
         right: 18px;
         bottom: 18px;
         max-width: min(360px, calc(100vw - 36px));
-        padding: 10px 12px;
-        border: 1px solid #d7d7d2;
-        border-radius: 8px;
-        background: #fcfcfa;
-        color: #1f2428;
-        box-shadow: 0 10px 28px rgba(31, 36, 40, 0.16);
+        padding: 11px 13px;
+        border: 1px solid rgba(255, 255, 255, 0.76);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.82);
+        color: #111827;
+        box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16);
+        backdrop-filter: blur(18px);
         font-size: 13px;
         line-height: 1.45;
       }
 
       .context-translator-toast[data-tone="busy"] {
-        border-color: #9fb7c9;
+        border-color: rgba(59, 130, 246, 0.36);
       }
 
       .context-translator-toast[data-tone="success"] {
-        border-color: #88b69b;
+        border-color: rgba(16, 185, 129, 0.38);
       }
 
       .context-translator-toast[data-tone="error"] {
-        border-color: #d88f7f;
+        border-color: rgba(244, 63, 94, 0.38);
       }
 
       .context-translator-panel {
@@ -389,12 +390,13 @@
         width: min(420px, calc(100vw - 36px));
         max-height: calc(100vh - 36px);
         overflow: auto;
-        padding: 14px;
-        border: 1px solid #d7d7d2;
-        border-radius: 8px;
-        background: #fcfcfa;
-        color: #1f2428;
-        box-shadow: 0 16px 42px rgba(31, 36, 40, 0.18);
+        padding: 15px;
+        border: 1px solid rgba(255, 255, 255, 0.76);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.84);
+        color: #111827;
+        box-shadow: 0 22px 56px rgba(15, 23, 42, 0.18);
+        backdrop-filter: blur(18px);
         font-size: 13px;
         line-height: 1.55;
       }
@@ -403,14 +405,14 @@
         display: block;
         margin: 0 0 6px;
         font: 600 12px/1.2 Inter, ui-sans-serif, system-ui, sans-serif;
-        color: #5c646b;
+        color: #52606f;
       }
 
       .context-translator-panel p {
         margin: 0 0 12px;
         white-space: pre-wrap;
         font: 13px/1.55 Inter, ui-sans-serif, system-ui, sans-serif;
-        color: #1f2428;
+        color: #111827;
       }
 
       .context-translator-panel button {
@@ -421,12 +423,13 @@
         justify-content: center;
         min-height: 30px;
         padding: 0 10px;
-        border: 1px solid #1f2428;
-        border-radius: 8px;
-        background: #1f2428;
+        border: 1px solid rgba(37, 99, 235, 0.2);
+        border-radius: 12px;
+        background: linear-gradient(135deg, #111827, #2563eb);
         color: #ffffff;
         cursor: pointer;
         font: 600 12px/1 Inter, ui-sans-serif, system-ui, sans-serif;
+        box-shadow: 0 10px 22px rgba(37, 99, 235, 0.24);
       }
     `;
 
