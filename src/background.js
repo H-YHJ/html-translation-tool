@@ -96,15 +96,7 @@ function resolveAutoSettings(settings, payload) {
     throw new Error("Auto 没有找到已保存的 API 密钥，请先为 DeepSeek、阿里云百炼或 OpenAI 保存密钥。");
   }
 
-  const totalChars = getPayloadCharacterCount(payload);
-  const headingCount = Array.isArray(payload?.pageContext?.headings) ? payload.pageContext.headings.length : 0;
-  const hasGlossary = Boolean(String(payload?.glossary || settings.glossary || "").trim());
-  const isLargeContextTask = totalChars > 4200 || headingCount > 18 || hasGlossary;
-  const preference = isLargeContextTask
-    ? ["aliyun", "deepseek", "openai", "custom"]
-    : ["deepseek", "aliyun", "openai", "custom"];
-
-  const selected = preference.map((provider) => candidates.find((item) => item.provider === provider)).find(Boolean) || candidates[0];
+  const selected = selectAutoCandidate(candidates, settings, payload);
 
   return {
     ...settings,
@@ -114,6 +106,48 @@ function resolveAutoSettings(settings, payload) {
     endpoint: selected.endpoint,
     model: selected.model
   };
+}
+
+function selectAutoCandidate(candidates, settings, payload) {
+  const totalChars = getPayloadCharacterCount(payload);
+  const headingCount = Array.isArray(payload?.pageContext?.headings) ? payload.pageContext.headings.length : 0;
+  const hasGlossary = Boolean(String(payload?.glossary || settings.glossary || "").trim());
+  const targetLanguage = String(payload?.targetLanguage || settings.targetLanguage || "");
+  const contextText = getAutoContextText(payload);
+  const isTechnicalTask = /\b(api|sdk|cli|json|xml|html|css|react|vue|typescript|javascript|python|github|npm|bug|stack|trace|release|changelog)\b|接口|代码|函数|参数|报错|文档|开发|模型|仓库/i.test(contextText);
+  const isLargeContextTask = totalChars > 4200 || headingCount > 18 || hasGlossary;
+  const isShortSelection = !Array.isArray(payload?.items) && totalChars < 900;
+  const targetIsChinese = /中文|Chinese/i.test(targetLanguage);
+  const targetIsEnglish = /英语|English/i.test(targetLanguage);
+
+  const scored = candidates.map((candidate) => ({
+    ...candidate,
+    score: getProviderBaseScore(candidate.provider)
+  }));
+
+  for (const candidate of scored) {
+    if (isTechnicalTask && candidate.provider === "deepseek") candidate.score += 6;
+    if (isTechnicalTask && candidate.provider === "openai") candidate.score += 2;
+    if (targetIsChinese && candidate.provider === "aliyun") candidate.score += 5;
+    if (targetIsChinese && candidate.provider === "deepseek") candidate.score += 3;
+    if (targetIsEnglish && candidate.provider === "openai") candidate.score += 5;
+    if (targetIsEnglish && candidate.provider === "deepseek") candidate.score += 2;
+    if (isLargeContextTask && candidate.provider === "aliyun") candidate.score += 4;
+    if (isLargeContextTask && candidate.provider === "deepseek") candidate.score += 2;
+    if (isShortSelection && candidate.provider === "deepseek") candidate.score += 3;
+  }
+
+  scored.sort((a, b) => b.score - a.score || getProviderBaseScore(b.provider) - getProviderBaseScore(a.provider));
+  return scored[0];
+}
+
+function getProviderBaseScore(provider) {
+  return {
+    deepseek: 8,
+    aliyun: 7,
+    openai: 6,
+    custom: 4
+  }[provider] || 0;
 }
 
 function buildAutoCandidates(settings) {
@@ -153,6 +187,23 @@ function getPayloadCharacterCount(payload) {
   }
 
   return String(payload?.text || "").length;
+}
+
+function getAutoContextText(payload) {
+  const pageContext = payload?.pageContext || {};
+  const headings = Array.isArray(pageContext.headings) ? pageContext.headings.join(" ") : "";
+  const bodySample = Array.isArray(payload?.items)
+    ? payload.items.slice(0, 12).map((item) => item?.text || "").join(" ")
+    : payload?.text || "";
+
+  return [
+    pageContext.title,
+    pageContext.metaDescription,
+    pageContext.openGraphTitle,
+    pageContext.openGraphDescription,
+    headings,
+    bodySample
+  ].filter(Boolean).join(" ");
 }
 
 function migrateModel(provider, model) {

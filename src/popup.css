@@ -255,6 +255,10 @@ button svg {
   box-shadow: none;
 }
 
+.field-icon:disabled {
+  cursor: default;
+}
+
 .key-glyph {
   position: relative;
   display: block;

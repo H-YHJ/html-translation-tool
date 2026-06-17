@@ -295,15 +295,28 @@ async function ensureContentScript(tabId) {
 }
 
 function statusFor(type, response) {
+  const providerSuffix = formatProviderSuffix(response.provider);
+
   if (type === "TRANSLATE_PAGE") {
-    return `已翻译 ${response.translated || 0} 段文本。`;
+    return `已翻译 ${response.translated || 0} 段文本${providerSuffix}。`;
   }
 
   if (type === "TRANSLATE_SELECTION") {
-    return "已翻译选中文本。";
+    return `已翻译选中文本${providerSuffix}。`;
   }
 
   return "已恢复原文。";
+}
+
+function formatProviderSuffix(provider) {
+  const labels = {
+    deepseek: "，使用 DeepSeek",
+    aliyun: "，使用阿里云百炼",
+    openai: "，使用 OpenAI",
+    custom: "，使用自定义接口"
+  };
+
+  return labels[provider] || "";
 }
 
 function setBusy(isBusy) {
