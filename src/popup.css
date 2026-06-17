@@ -1,8 +1,8 @@
 :root {
   color-scheme: light;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
-  background: #eef3f8;
-  color: #111827;
+  background: #f3f3f1;
+  color: #111111;
 }
 
 * {
@@ -14,15 +14,14 @@ body {
   min-height: 520px;
   margin: 0;
   background:
-    radial-gradient(circle at 14% 4%, rgba(76, 141, 255, 0.22), transparent 30%),
-    radial-gradient(circle at 88% 12%, rgba(62, 203, 169, 0.18), transparent 28%),
-    linear-gradient(145deg, #f8fbff 0%, #edf2f7 52%, #f6f7fb 100%);
+    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.94), transparent 32%),
+    linear-gradient(145deg, #fbfbfa 0%, #eeeeeb 52%, #f7f7f5 100%);
 }
 
 .shell {
   position: relative;
   padding: 16px;
-  animation: surface-in 280ms ease-out both;
+  animation: surface-in 260ms ease-out both;
 }
 
 .app-header {
@@ -47,13 +46,11 @@ body {
   width: 42px;
   height: 42px;
   place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.78);
+  border: 1px solid #111111;
   border-radius: 14px;
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.56)),
-    linear-gradient(135deg, #3b82f6, #25c2a0);
+  background: linear-gradient(145deg, #ffffff, #e6e6e2);
   box-shadow:
-    0 12px 28px rgba(37, 99, 235, 0.2),
+    0 12px 26px rgba(17, 17, 17, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
   overflow: hidden;
 }
@@ -62,7 +59,7 @@ body {
   position: absolute;
   inset: 6px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #2563eb, #10b981);
+  background: #111111;
   content: "";
 }
 
@@ -71,13 +68,13 @@ body {
   z-index: 1;
   color: #ffffff;
   font-size: 19px;
-  font-weight: 800;
+  font-weight: 820;
   line-height: 1;
 }
 
 h1 {
   margin: 0;
-  color: #111827;
+  color: #111111;
   font-size: 18px;
   font-weight: 760;
   letter-spacing: 0;
@@ -85,7 +82,7 @@ h1 {
 
 p {
   margin: 4px 0 0;
-  color: #5f6b7a;
+  color: #5f5f5b;
   font-size: 12px;
   line-height: 1.45;
 }
@@ -94,12 +91,12 @@ p {
   display: grid;
   gap: 10px;
   padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(17, 17, 17, 0.08);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.76);
   box-shadow:
-    0 18px 50px rgba(15, 23, 42, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+    0 18px 44px rgba(17, 17, 17, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(18px);
 }
 
@@ -115,9 +112,9 @@ p {
 }
 
 label {
-  color: #273244;
+  color: #191919;
   font-size: 12px;
-  font-weight: 680;
+  font-weight: 700;
 }
 
 input,
@@ -125,23 +122,33 @@ select,
 textarea {
   width: 100%;
   min-height: 38px;
-  border: 1px solid rgba(148, 163, 184, 0.42);
+  border: 1px solid rgba(17, 17, 17, 0.16);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.84);
-  color: #111827;
+  background: rgba(255, 255, 255, 0.82);
+  color: #111111;
   font: inherit;
   font-size: 13px;
   outline: none;
   transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    background-color 160ms ease,
-    transform 160ms ease;
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    background-color 150ms ease,
+    transform 150ms ease;
 }
 
 input,
 select {
   padding: 0 11px;
+}
+
+input:disabled {
+  color: #71716d;
+  -webkit-text-fill-color: #71716d;
+}
+
+input:disabled,
+textarea:disabled {
+  background: rgba(244, 244, 241, 0.72);
 }
 
 select {
@@ -159,8 +166,8 @@ select {
   right: 12px;
   width: 7px;
   height: 7px;
-  border-right: 1.8px solid #64748b;
-  border-bottom: 1.8px solid #64748b;
+  border-right: 1.8px solid #474743;
+  border-bottom: 1.8px solid #474743;
   pointer-events: none;
   transform: translateY(-65%) rotate(45deg);
   content: "";
@@ -175,9 +182,9 @@ textarea {
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: rgba(59, 130, 246, 0.7);
+  border-color: rgba(17, 17, 17, 0.48);
   background: #ffffff;
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.14);
+  box-shadow: 0 0 0 4px rgba(17, 17, 17, 0.08);
 }
 
 .secret-field {
@@ -193,17 +200,17 @@ textarea:focus {
 
 button {
   min-height: 38px;
-  border: 1px solid rgba(148, 163, 184, 0.44);
+  border: 1px solid rgba(17, 17, 17, 0.14);
   border-radius: 12px;
   cursor: pointer;
   font: inherit;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 720;
   transition:
-    transform 150ms ease,
-    box-shadow 150ms ease,
-    border-color 150ms ease,
-    background-color 150ms ease;
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    border-color 140ms ease,
+    background-color 140ms ease;
 }
 
 button:hover {
@@ -216,7 +223,7 @@ button:active {
 
 button:disabled {
   cursor: wait;
-  opacity: 0.65;
+  opacity: 0.58;
   transform: none;
 }
 
@@ -237,8 +244,8 @@ button svg {
   min-height: 38px;
   place-items: center;
   background: rgba(255, 255, 255, 0.82);
-  color: #334155;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  color: #111111;
+  box-shadow: 0 8px 22px rgba(17, 17, 17, 0.08);
 }
 
 .field-icon {
@@ -246,6 +253,69 @@ button svg {
   min-width: 40px;
   min-height: 38px;
   box-shadow: none;
+}
+
+.key-glyph {
+  position: relative;
+  display: block;
+  width: 18px;
+  height: 12px;
+  border: 1.8px solid currentColor;
+  border-radius: 999px 999px 860px 860px;
+  transform: scaleY(0.28) rotate(-6deg);
+  transition:
+    border-radius 160ms ease,
+    transform 160ms ease,
+    height 160ms ease;
+}
+
+.key-glyph::before,
+.key-glyph::after {
+  position: absolute;
+  content: "";
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease,
+    background-color 160ms ease,
+    width 160ms ease;
+}
+
+.key-glyph::before {
+  top: 50%;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.35);
+}
+
+.key-glyph::after {
+  top: 50%;
+  left: 50%;
+  width: 22px;
+  height: 1.8px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 1;
+  transform: translate(-50%, -50%) rotate(-35deg);
+}
+
+.field-icon.is-visible .key-glyph {
+  height: 14px;
+  border-radius: 58% 58% 52% 52%;
+  transform: scaleY(1) rotate(0deg);
+}
+
+.field-icon.is-visible .key-glyph::before {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.field-icon.is-visible .key-glyph::after {
+  opacity: 0;
+  transform: translate(-50%, -50%) rotate(0deg);
 }
 
 .actions {
@@ -266,31 +336,32 @@ button svg {
 }
 
 .primary {
-  border-color: rgba(37, 99, 235, 0.2);
-  background: linear-gradient(135deg, #111827, #2563eb);
+  border-color: #111111;
+  background: #111111;
   color: #ffffff;
-  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.24);
+  box-shadow: 0 14px 28px rgba(17, 17, 17, 0.24);
 }
 
 .secondary {
   background: rgba(255, 255, 255, 0.8);
-  color: #111827;
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.07);
+  color: #111111;
+  box-shadow: 0 8px 22px rgba(17, 17, 17, 0.07);
 }
 
 .status {
   min-height: 18px;
   margin-top: 10px;
   padding: 0 2px;
-  color: #52606a;
+  color: #5f5f5b;
 }
 
 .status[data-tone="error"] {
-  color: #b42318;
+  color: #111111;
+  font-weight: 720;
 }
 
 .status[data-tone="success"] {
-  color: #087443;
+  color: #111111;
 }
 
 @keyframes surface-in {

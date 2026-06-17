@@ -360,26 +360,27 @@
         bottom: 18px;
         max-width: min(360px, calc(100vw - 36px));
         padding: 11px 13px;
-        border: 1px solid rgba(255, 255, 255, 0.76);
+        border: 1px solid rgba(17, 17, 17, 0.1);
         border-radius: 14px;
         background: rgba(255, 255, 255, 0.82);
-        color: #111827;
-        box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16);
+        color: #111111;
+        box-shadow: 0 18px 42px rgba(17, 17, 17, 0.16);
         backdrop-filter: blur(18px);
         font-size: 13px;
         line-height: 1.45;
       }
 
       .context-translator-toast[data-tone="busy"] {
-        border-color: rgba(59, 130, 246, 0.36);
+        border-color: rgba(17, 17, 17, 0.2);
       }
 
       .context-translator-toast[data-tone="success"] {
-        border-color: rgba(16, 185, 129, 0.38);
+        border-color: rgba(17, 17, 17, 0.24);
       }
 
       .context-translator-toast[data-tone="error"] {
-        border-color: rgba(244, 63, 94, 0.38);
+        border-color: rgba(17, 17, 17, 0.4);
+        font-weight: 700;
       }
 
       .context-translator-panel {
@@ -391,11 +392,11 @@
         max-height: calc(100vh - 36px);
         overflow: auto;
         padding: 15px;
-        border: 1px solid rgba(255, 255, 255, 0.76);
+        border: 1px solid rgba(17, 17, 17, 0.1);
         border-radius: 16px;
         background: rgba(255, 255, 255, 0.84);
-        color: #111827;
-        box-shadow: 0 22px 56px rgba(15, 23, 42, 0.18);
+        color: #111111;
+        box-shadow: 0 22px 56px rgba(17, 17, 17, 0.18);
         backdrop-filter: blur(18px);
         font-size: 13px;
         line-height: 1.55;
@@ -405,14 +406,14 @@
         display: block;
         margin: 0 0 6px;
         font: 600 12px/1.2 Inter, ui-sans-serif, system-ui, sans-serif;
-        color: #52606f;
+        color: #5f5f5b;
       }
 
       .context-translator-panel p {
         margin: 0 0 12px;
         white-space: pre-wrap;
         font: 13px/1.55 Inter, ui-sans-serif, system-ui, sans-serif;
-        color: #111827;
+        color: #111111;
       }
 
       .context-translator-panel button {
@@ -423,13 +424,13 @@
         justify-content: center;
         min-height: 30px;
         padding: 0 10px;
-        border: 1px solid rgba(37, 99, 235, 0.2);
+        border: 1px solid #111111;
         border-radius: 12px;
-        background: linear-gradient(135deg, #111827, #2563eb);
+        background: #111111;
         color: #ffffff;
         cursor: pointer;
         font: 600 12px/1 Inter, ui-sans-serif, system-ui, sans-serif;
-        box-shadow: 0 10px 22px rgba(37, 99, 235, 0.24);
+        box-shadow: 0 10px 22px rgba(17, 17, 17, 0.24);
       }
     `;
 

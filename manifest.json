@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "上下文翻译助手",
-  "version": "0.2.0",
-  "description": "先分析网页语境，再生成更准确译文的网页翻译扩展。",
+  "version": "0.3.0",
+  "description": "黑白极简风格的上下文网页翻译扩展，可自动选择已连接模型。",
   "permissions": ["activeTab", "storage", "scripting"],
   "host_permissions": [
     "https://api.openai.com/*",

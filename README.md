@@ -8,6 +8,8 @@
 - 翻译页面选中文本，显示原文和译文浮层。
 - 一键恢复原文。
 - 自定义目标语言、模型、Chat Completions 接口和术语偏好。
+- `Auto 自动选择` 翻译服务：根据任务规模和上下文复杂度，在已保存密钥的服务中自动选择合适模型。
+- 黑白极简界面，API 密钥支持图形按钮显示/隐藏。
 - 只把译文写入文本节点，不把模型返回内容当作 HTML 注入页面。
 
 ## 使用方法
@@ -31,6 +33,7 @@
 
 弹窗里已经内置了几个 OpenAI 兼容 provider 预设：
 
+- Auto 自动选择：短文本优先 DeepSeek，长页面/术语上下文较多时优先阿里云百炼，只会使用已保存 API 密钥的服务。
 - DeepSeek: `https://api.deepseek.com/chat/completions`, default model `deepseek-v4-pro`
 - Alibaba Cloud Bailian: `https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions`, default model `qwen3.6-plus`
 - OpenAI: `https://api.openai.com/v1/chat/completions`, default model `gpt-4.1-mini`

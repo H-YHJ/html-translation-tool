@@ -1,4 +1,9 @@
 const PROVIDERS = {
+  auto: {
+    label: "Auto 自动选择",
+    endpoint: "",
+    model: ""
+  },
   openai: {
     label: "OpenAI",
     endpoint: "https://api.openai.com/v1/chat/completions",
@@ -22,7 +27,7 @@ const PROVIDERS = {
 };
 
 const DEFAULT_SETTINGS = {
-  provider: "deepseek",
+  provider: "auto",
   apiKey: "",
   apiKeys: {
     openai: "",
@@ -103,13 +108,13 @@ async function init() {
 
 function normalizeSettings(stored) {
   const provider = stored.provider || DEFAULT_SETTINGS.provider;
-  const preset = PROVIDERS[provider] || PROVIDERS.custom;
+  const preset = PROVIDERS[provider] || PROVIDERS.auto;
   const apiKeys = { ...DEFAULT_SETTINGS.apiKeys, ...(stored.apiKeys || {}) };
-  const storedModel = stored.model || preset.model;
+  const storedModel = stored.model || preset.model || DEFAULT_SETTINGS.model;
   const model = migrateModel(provider, storedModel);
   const targetLanguage = migrateLanguage(stored.targetLanguage || DEFAULT_SETTINGS.targetLanguage);
 
-  if (stored.apiKey && !apiKeys[provider]) {
+  if (stored.apiKey && provider !== "auto" && !apiKeys[provider]) {
     apiKeys[provider] = stored.apiKey;
   }
 
@@ -118,8 +123,8 @@ function normalizeSettings(stored) {
     ...stored,
     apiKeys,
     provider,
-    apiKey: apiKeys[provider] || "",
-    endpoint: stored.endpoint || preset.endpoint,
+    apiKey: provider === "auto" ? "" : apiKeys[provider] || "",
+    endpoint: stored.endpoint || preset.endpoint || DEFAULT_SETTINGS.endpoint,
     model,
     targetLanguage
   };
@@ -137,63 +142,73 @@ function migrateLanguage(language) {
 
 function setFormValues(settings) {
   const provider = settings.provider || DEFAULT_SETTINGS.provider;
-  const preset = PROVIDERS[provider] || PROVIDERS.custom;
 
   controls.provider.value = provider;
-  controls.apiKey.value = settings.apiKeys?.[provider] || settings.apiKey || "";
-  controls.apiKeyLabel.textContent = `${preset.label} API 密钥`;
-  setApiKeyVisibility(false);
-  controls.endpoint.value = settings.endpoint || preset.endpoint;
-  controls.model.value = settings.model || preset.model;
   controls.targetLanguage.value = settings.targetLanguage || DEFAULT_SETTINGS.targetLanguage;
   controls.glossary.value = settings.glossary || "";
+  applyProviderPresentation(provider, settings);
 }
 
 function getFormValues() {
   const provider = controls.provider.value;
-  const preset = PROVIDERS[provider] || PROVIDERS.custom;
+  const preset = PROVIDERS[provider] || PROVIDERS.auto;
   const apiKeys = { ...DEFAULT_SETTINGS.apiKeys, ...(settingsCache.apiKeys || {}) };
-  const apiKey = controls.apiKey.value.trim();
 
-  apiKeys[provider] = apiKey;
+  if (provider !== "auto") {
+    apiKeys[provider] = controls.apiKey.value.trim();
+  }
 
   return {
     provider,
-    apiKey,
+    apiKey: provider === "auto" ? "" : apiKeys[provider],
     apiKeys,
-    endpoint: controls.endpoint.value.trim() || preset.endpoint,
-    model: controls.model.value.trim() || preset.model,
+    endpoint: provider === "auto" ? settingsCache.endpoint : controls.endpoint.value.trim() || preset.endpoint,
+    model: provider === "auto" ? settingsCache.model : controls.model.value.trim() || preset.model,
     targetLanguage: controls.targetLanguage.value,
     glossary: controls.glossary.value.trim()
   };
 }
 
 function handleProviderChange() {
-  const provider = controls.provider.value;
-  const preset = PROVIDERS[provider] || PROVIDERS.custom;
+  const nextProvider = controls.provider.value;
   const apiKeys = { ...DEFAULT_SETTINGS.apiKeys, ...(settingsCache.apiKeys || {}) };
 
-  apiKeys[activeProvider] = controls.apiKey.value.trim();
-  activeProvider = provider;
+  if (activeProvider !== "auto") {
+    apiKeys[activeProvider] = controls.apiKey.value.trim();
+  }
 
   settingsCache = {
     ...settingsCache,
     apiKeys,
-    provider,
-    apiKey: apiKeys[provider] || "",
-    endpoint: preset.endpoint || settingsCache.endpoint || "",
-    model: preset.model || settingsCache.model || "",
+    provider: nextProvider,
+    apiKey: nextProvider === "auto" ? "" : apiKeys[nextProvider] || "",
+    endpoint: nextProvider === "auto" ? settingsCache.endpoint : PROVIDERS[nextProvider].endpoint || settingsCache.endpoint,
+    model: nextProvider === "auto" ? settingsCache.model : PROVIDERS[nextProvider].model || settingsCache.model,
     targetLanguage: controls.targetLanguage.value,
     glossary: controls.glossary.value.trim()
   };
 
-  controls.apiKey.value = apiKeys[provider] || "";
-  controls.apiKeyLabel.textContent = `${preset.label} API 密钥`;
-  setApiKeyVisibility(false);
-  controls.endpoint.value = preset.endpoint || settingsCache.endpoint || "";
-  controls.model.value = preset.model || settingsCache.model || "";
+  activeProvider = nextProvider;
+  applyProviderPresentation(nextProvider, settingsCache);
+  setStatus(nextProvider === "auto" ? "已启用 Auto，将按任务自动选择已连接模型。" : `已切换到 ${PROVIDERS[nextProvider].label}。`, "success");
+}
 
-  setStatus(`已切换到 ${preset.label}。`, "success");
+function applyProviderPresentation(provider, settings) {
+  const preset = PROVIDERS[provider] || PROVIDERS.auto;
+  const isAuto = provider === "auto";
+
+  controls.apiKeyLabel.textContent = isAuto ? "已连接密钥" : `${preset.label} API 密钥`;
+  controls.apiKey.disabled = isAuto;
+  controls.apiKey.value = isAuto ? "" : settings.apiKeys?.[provider] || settings.apiKey || "";
+  controls.apiKey.placeholder = isAuto ? "使用已保存的服务密钥" : "sk-...";
+  controls.toggleApiKey.disabled = isAuto;
+
+  controls.model.disabled = isAuto;
+  controls.endpoint.disabled = isAuto;
+  controls.model.value = isAuto ? "自动选择" : settings.model || preset.model;
+  controls.endpoint.value = isAuto ? "自动选择" : settings.endpoint || preset.endpoint;
+
+  setApiKeyVisibility(false);
 }
 
 function toggleApiKeyVisibility() {
@@ -202,8 +217,7 @@ function toggleApiKeyVisibility() {
 
 function setApiKeyVisibility(isVisible) {
   controls.apiKey.type = isVisible ? "text" : "password";
-  controls.toggleApiKey.querySelector(".icon-eye").hidden = isVisible;
-  controls.toggleApiKey.querySelector(".icon-eye-off").hidden = !isVisible;
+  controls.toggleApiKey.classList.toggle("is-visible", isVisible);
   controls.toggleApiKey.title = isVisible ? "隐藏 API 密钥" : "显示 API 密钥";
   controls.toggleApiKey.setAttribute("aria-label", isVisible ? "隐藏 API 密钥" : "显示 API 密钥");
   controls.toggleApiKey.setAttribute("aria-pressed", String(isVisible));

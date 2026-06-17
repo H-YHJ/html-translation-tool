@@ -18,7 +18,7 @@ const PROVIDERS = {
 };
 
 const DEFAULT_SETTINGS = {
-  provider: "deepseek",
+  provider: "auto",
   apiKey: "",
   apiKeys: {
     openai: "",
@@ -28,7 +28,7 @@ const DEFAULT_SETTINGS = {
   },
   endpoint: PROVIDERS.deepseek.endpoint,
   model: PROVIDERS.deepseek.model,
-  targetLanguage: "Simplified Chinese",
+  targetLanguage: "简体中文",
   glossary: "",
   temperature: 0.1
 };
@@ -64,11 +64,16 @@ async function handleMessage(message) {
   throw new Error(`不支持的请求：${message.type}`);
 }
 
-async function getSettings() {
+async function getSettings(payload = {}) {
   const stored = await chrome.storage.local.get(DEFAULT_SETTINGS);
   const provider = stored.provider || DEFAULT_SETTINGS.provider;
-  const preset = PROVIDERS[provider] || PROVIDERS.custom;
   const apiKeys = { ...DEFAULT_SETTINGS.apiKeys, ...(stored.apiKeys || {}) };
+
+  if (provider === "auto") {
+    return resolveAutoSettings({ ...DEFAULT_SETTINGS, ...stored, apiKeys, provider }, payload);
+  }
+
+  const preset = PROVIDERS[provider] || PROVIDERS.deepseek;
   const storedModel = stored.model || preset.model;
   const model = migrateModel(provider, storedModel);
 
@@ -77,10 +82,77 @@ async function getSettings() {
     ...stored,
     apiKeys,
     provider,
+    resolvedProvider: provider,
     apiKey: apiKeys[provider] || stored.apiKey || "",
     endpoint: stored.endpoint || preset.endpoint,
     model
   };
+}
+
+function resolveAutoSettings(settings, payload) {
+  const candidates = buildAutoCandidates(settings);
+
+  if (!candidates.length) {
+    throw new Error("Auto 没有找到已保存的 API 密钥，请先为 DeepSeek、阿里云百炼或 OpenAI 保存密钥。");
+  }
+
+  const totalChars = getPayloadCharacterCount(payload);
+  const headingCount = Array.isArray(payload?.pageContext?.headings) ? payload.pageContext.headings.length : 0;
+  const hasGlossary = Boolean(String(payload?.glossary || settings.glossary || "").trim());
+  const isLargeContextTask = totalChars > 4200 || headingCount > 18 || hasGlossary;
+  const preference = isLargeContextTask
+    ? ["aliyun", "deepseek", "openai", "custom"]
+    : ["deepseek", "aliyun", "openai", "custom"];
+
+  const selected = preference.map((provider) => candidates.find((item) => item.provider === provider)).find(Boolean) || candidates[0];
+
+  return {
+    ...settings,
+    provider: "auto",
+    resolvedProvider: selected.provider,
+    apiKey: selected.apiKey,
+    endpoint: selected.endpoint,
+    model: selected.model
+  };
+}
+
+function buildAutoCandidates(settings) {
+  const apiKeys = settings.apiKeys || {};
+  const candidates = [];
+
+  for (const provider of ["deepseek", "aliyun", "openai"]) {
+    const apiKey = String(apiKeys[provider] || "").trim();
+    if (!apiKey) {
+      continue;
+    }
+
+    candidates.push({
+      provider,
+      apiKey,
+      endpoint: PROVIDERS[provider].endpoint,
+      model: PROVIDERS[provider].model
+    });
+  }
+
+  const customApiKey = String(apiKeys.custom || "").trim();
+  if (customApiKey && settings.endpoint && settings.model) {
+    candidates.push({
+      provider: "custom",
+      apiKey: customApiKey,
+      endpoint: settings.endpoint,
+      model: settings.model
+    });
+  }
+
+  return candidates;
+}
+
+function getPayloadCharacterCount(payload) {
+  if (Array.isArray(payload?.items)) {
+    return payload.items.reduce((sum, item) => sum + String(item?.text || "").length, 0);
+  }
+
+  return String(payload?.text || "").length;
 }
 
 function migrateModel(provider, model) {
@@ -89,7 +161,7 @@ function migrateModel(provider, model) {
 }
 
 async function translateBatch(payload) {
-  const settings = await getSettings();
+  const settings = await getSettings(payload);
   ensureReady(settings);
 
   const items = Array.isArray(payload?.items) ? payload.items : [];
@@ -100,11 +172,11 @@ async function translateBatch(payload) {
   const content = await callChatCompletion(settings, buildBatchMessages(settings, payload));
   const parsed = parseJsonFromModel(content);
   const translations = normalizeBatchTranslations(parsed, items);
-  return { translations };
+  return { translations, provider: settings.resolvedProvider || settings.provider };
 }
 
 async function translateSelection(payload) {
-  const settings = await getSettings();
+  const settings = await getSettings(payload);
   ensureReady(settings);
 
   const text = String(payload?.text || "").trim();
@@ -122,13 +194,14 @@ async function translateSelection(payload) {
 
   return {
     translation,
-    notes: String(parsed.notes || "").trim()
+    notes: String(parsed.notes || "").trim(),
+    provider: settings.resolvedProvider || settings.provider
   };
 }
 
 function ensureReady(settings) {
   if (!settings.apiKey || !settings.apiKey.trim()) {
-    throw new Error(`请先填写 ${settings.provider} 的 API 密钥。`);
+    throw new Error(`请先填写 ${settings.resolvedProvider || settings.provider} 的 API 密钥。`);
   }
 
   if (!settings.endpoint || !settings.endpoint.trim()) {
