@@ -217,8 +217,7 @@ function toggleApiKeyVisibility() {
 
 function setApiKeyVisibility(isVisible) {
   controls.apiKey.type = isVisible ? "text" : "password";
-  controls.toggleApiKey.querySelector(".icon-eye").hidden = !isVisible;
-  controls.toggleApiKey.querySelector(".icon-eye-off").hidden = isVisible;
+  controls.toggleApiKey.dataset.visible = String(isVisible);
   controls.toggleApiKey.title = isVisible ? "隐藏 API 密钥" : "显示 API 密钥";
   controls.toggleApiKey.setAttribute("aria-label", isVisible ? "隐藏 API 密钥" : "显示 API 密钥");
   controls.toggleApiKey.setAttribute("aria-pressed", String(isVisible));

@@ -262,7 +262,19 @@ button svg {
   cursor: default;
 }
 
-.field-icon svg[hidden] {
+.field-icon .icon-eye {
+  display: none;
+}
+
+.field-icon .icon-eye-off {
+  display: block;
+}
+
+.field-icon[data-visible="true"] .icon-eye {
+  display: block;
+}
+
+.field-icon[data-visible="true"] .icon-eye-off {
   display: none;
 }
 
