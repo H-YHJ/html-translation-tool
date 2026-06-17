@@ -1,6 +1,6 @@
 const PROVIDERS = {
   auto: {
-    label: "Auto 自动选择",
+    label: "Auto",
     endpoint: "",
     model: ""
   },
@@ -190,7 +190,7 @@ function handleProviderChange() {
 
   activeProvider = nextProvider;
   applyProviderPresentation(nextProvider, settingsCache);
-  setStatus(nextProvider === "auto" ? "已启用 Auto，将按任务自动选择已连接模型。" : `已切换到 ${PROVIDERS[nextProvider].label}。`, "success");
+  setStatus(nextProvider === "auto" ? "已启用 Auto，将按任务选择已连接模型。" : `已切换到 ${PROVIDERS[nextProvider].label}。`, "success");
 }
 
 function applyProviderPresentation(provider, settings) {
@@ -217,7 +217,8 @@ function toggleApiKeyVisibility() {
 
 function setApiKeyVisibility(isVisible) {
   controls.apiKey.type = isVisible ? "text" : "password";
-  controls.toggleApiKey.classList.toggle("is-visible", isVisible);
+  controls.toggleApiKey.querySelector(".icon-eye").hidden = !isVisible;
+  controls.toggleApiKey.querySelector(".icon-eye-off").hidden = isVisible;
   controls.toggleApiKey.title = isVisible ? "隐藏 API 密钥" : "显示 API 密钥";
   controls.toggleApiKey.setAttribute("aria-label", isVisible ? "隐藏 API 密钥" : "显示 API 密钥");
   controls.toggleApiKey.setAttribute("aria-pressed", String(isVisible));

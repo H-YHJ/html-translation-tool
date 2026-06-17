@@ -31,7 +31,7 @@
 
 弹窗里已经内置了几个 OpenAI 兼容 provider 预设：
 
-- Auto 自动选择：根据任务特征和已保存密钥，在已连接服务中选择更适合的模型。
+- Auto：根据任务特征和已保存密钥，在已连接服务中选择更适合的模型。
 - DeepSeek: `https://api.deepseek.com/chat/completions`, default model `deepseek-v4-pro`
 - Alibaba Cloud Bailian: `https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions`, default model `qwen3.6-plus`
 - OpenAI: `https://api.openai.com/v1/chat/completions`, default model `gpt-4.1-mini`
