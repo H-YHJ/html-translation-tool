@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Context Translator app icon</title>
+  <desc id="desc">Ocean blue rounded icon with a white T and a small thinking bubble.</desc>
+  <defs>
+    <linearGradient id="ocean" x1="174" y1="74" x2="854" y2="944" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#42d7ff"/>
+      <stop offset="0.43" stop-color="#087bdc"/>
+      <stop offset="1" stop-color="#034aa7"/>
+    </linearGradient>
+    <radialGradient id="surfaceGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(246 150) rotate(59) scale(744 624)">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.44"/>
+      <stop offset="0.45" stop-color="#ffffff" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="edgeShine" x1="166" y1="80" x2="857" y2="950" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#001f57" stop-opacity="0.24"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="230" fill="url(#ocean)"/>
+  <rect width="1024" height="1024" rx="230" fill="url(#surfaceGlow)"/>
+  <rect x="24" y="24" width="976" height="976" rx="214" fill="none" stroke="url(#edgeShine)" stroke-width="48"/>
+  <g fill="#002f73" opacity="0.23">
+    <rect x="222" y="276" width="430" height="118" rx="46"/>
+    <rect x="366" y="344" width="140" height="500" rx="56"/>
+    <rect x="622" y="444" width="238" height="152" rx="76"/>
+    <circle cx="596" cy="630" r="31"/>
+    <circle cx="550" cy="686" r="20"/>
+  </g>
+  <g>
+    <rect x="222" y="252" width="430" height="118" rx="46" fill="#f8fdff"/>
+    <rect x="366" y="320" width="140" height="500" rx="56" fill="#f8fdff"/>
+    <rect x="622" y="420" width="238" height="152" rx="76" fill="#f8fdff"/>
+    <circle cx="596" cy="606" r="31" fill="#f8fdff"/>
+    <circle cx="550" cy="662" r="20" fill="#f8fdff"/>
+    <circle cx="696" cy="496" r="15" fill="#087bdc" opacity="0.9"/>
+    <circle cx="741" cy="496" r="15" fill="#087bdc" opacity="0.9"/>
+    <circle cx="786" cy="496" r="15" fill="#087bdc" opacity="0.9"/>
+  </g>
+</svg>
