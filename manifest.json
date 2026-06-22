@@ -1,13 +1,20 @@
 {
   "manifest_version": 3,
   "name": "上下文翻译助手",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "先分析网页语境，再生成更准确译文的网页翻译扩展。",
-  "permissions": ["activeTab", "storage", "scripting"],
+  "icons": {
+    "16": "assets/icon-16.png",
+    "32": "assets/icon-32.png",
+    "48": "assets/icon-48.png",
+    "128": "assets/icon-128.png"
+  },
+  "permissions": ["activeTab", "storage", "scripting", "contextMenus"],
   "host_permissions": [
     "https://api.openai.com/*",
     "https://*.openai.azure.com/*",
     "https://api.deepseek.com/*",
+    "https://openrouter.ai/*",
     "https://dashscope.aliyuncs.com/*",
     "https://dashscope-us.aliyuncs.com/*",
     "https://*.maas.aliyuncs.com/*",
@@ -15,6 +22,12 @@
     "http://127.0.0.1/*"
   ],
   "action": {
+    "default_icon": {
+      "16": "assets/icon-16.png",
+      "32": "assets/icon-32.png",
+      "48": "assets/icon-48.png",
+      "128": "assets/icon-128.png"
+    },
     "default_popup": "src/popup.html",
     "default_title": "上下文翻译助手"
   },
