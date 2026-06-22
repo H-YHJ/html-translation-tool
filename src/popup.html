@@ -6,12 +6,12 @@
     <title>上下文翻译助手</title>
     <link rel="stylesheet" href="popup.css">
   </head>
-  <body>
+  <body data-provider="auto">
     <main class="shell">
       <header class="app-header">
         <div class="brand">
           <div class="logo-mark" aria-hidden="true">
-            <span>译</span>
+            <img src="../assets/icon-128.png" alt="">
           </div>
           <div>
             <h1>上下文翻译助手</h1>
@@ -27,87 +27,160 @@
       </header>
 
       <section class="panel">
-        <div class="section">
-          <label for="provider">翻译服务</label>
-          <div class="select-shell">
-            <select id="provider">
-              <option value="auto">Auto</option>
-              <option value="deepseek">DeepSeek</option>
-              <option value="aliyun">阿里云百炼</option>
-              <option value="openai">OpenAI</option>
-              <option value="custom">自定义兼容接口</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="section">
-          <label for="targetLanguage">翻译为</label>
-          <div class="select-shell">
-            <select id="targetLanguage">
-              <option>简体中文</option>
-              <option>繁体中文</option>
-              <option>英语</option>
-              <option>日语</option>
-              <option>韩语</option>
-              <option>德语</option>
-              <option>法语</option>
-              <option>西班牙语</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="section">
-          <label id="apiKeyLabel" for="apiKey">API 密钥</label>
-          <div class="secret-field">
-            <input id="apiKey" type="password" autocomplete="off" placeholder="sk-...">
-            <button id="toggleApiKey" class="icon-button field-icon" type="button" aria-controls="apiKey" aria-pressed="false" aria-label="显示 API 密钥" title="显示 API 密钥" data-visible="false">
-              <svg class="icon-eye" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"></path>
-                <circle cx="12" cy="12" r="3"></circle>
-              </svg>
-              <svg class="icon-eye-off" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M10.7 5.1A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a18.6 18.6 0 0 1-2.1 3.1"></path>
-                <path d="M14.1 14.1A3 3 0 0 1 9.9 9.9"></path>
-                <path d="M3 3l18 18"></path>
-                <path d="M6.4 6.4C3.6 8.3 2 12 2 12s3.5 7 10 7a10.8 10.8 0 0 0 4.2-.9"></path>
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <div class="grid-2">
+        <div class="grid-2 compact-grid">
           <div class="section">
-            <label for="model">模型</label>
-            <input id="model" type="text" autocomplete="off">
+            <label for="provider">翻译服务</label>
+            <div class="select-shell ui-select">
+              <select id="provider">
+                <option value="auto">Auto</option>
+                <option value="deepseek">DeepSeek</option>
+                <option value="aliyun">阿里云百炼</option>
+                <option value="openai">OpenAI</option>
+                <option value="openrouter">OpenRouter</option>
+                <option value="chrome">Chrome 内置翻译</option>
+                <option value="libretranslate">LibreTranslate 本地</option>
+                <option value="custom">自定义兼容接口</option>
+              </select>
+            </div>
           </div>
+
           <div class="section">
-            <label for="endpoint">接口地址</label>
-            <input id="endpoint" type="url" autocomplete="off">
+            <label for="targetLanguage">翻译为</label>
+            <div class="select-shell ui-select">
+              <select id="targetLanguage">
+                <option>简体中文</option>
+                <option>繁体中文</option>
+                <option>英语</option>
+                <option>日语</option>
+                <option>韩语</option>
+                <option>德语</option>
+                <option>法语</option>
+                <option>西班牙语</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="separator" role="separator" aria-orientation="horizontal"></div>
+
+        <div class="provider-config" data-provider-config>
+          <div class="section">
+            <label id="apiKeyLabel" for="apiKey">API 密钥</label>
+            <div class="secret-field">
+              <input id="apiKey" type="password" autocomplete="off" placeholder="sk-...">
+              <button id="toggleApiKey" class="icon-button field-icon" type="button" aria-controls="apiKey" aria-pressed="false" aria-label="显示 API 密钥" title="显示 API 密钥" data-visible="false">
+                <svg class="icon-eye" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+                <svg class="icon-eye-off" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M10.7 5.1A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a18.6 18.6 0 0 1-2.1 3.1"></path>
+                  <path d="M14.1 14.1A3 3 0 0 1 9.9 9.9"></path>
+                  <path d="M3 3l18 18"></path>
+                  <path d="M6.4 6.4C3.6 8.3 2 12 2 12s3.5 7 10 7a10.8 10.8 0 0 0 4.2-.9"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="section">
+              <label id="modelLabel" for="model">模型</label>
+              <div class="model-field">
+                <input id="model" type="text" autocomplete="off" list="openRouterModels">
+                <button id="refreshOpenRouterModels" class="icon-button field-icon" type="button" aria-label="刷新 OpenRouter 模型" title="刷新 OpenRouter 模型">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M21 12a9 9 0 1 1-2.6-6.4"></path>
+                    <path d="M21 3v6h-6"></path>
+                  </svg>
+                </button>
+                <datalist id="openRouterModels"></datalist>
+              </div>
+            </div>
+            <div class="section">
+              <label for="endpoint">接口地址</label>
+              <input id="endpoint" type="url" autocomplete="off">
+            </div>
           </div>
         </div>
 
         <div class="section">
           <label for="glossary">术语偏好</label>
-          <textarea id="glossary" rows="3" placeholder="例如：prompt=提示词；fine-tuning=微调；Copilot 不翻译"></textarea>
+          <textarea id="glossary" rows="2" placeholder="prompt=提示词；fine-tuning=微调；Copilot 不翻译"></textarea>
+        </div>
+
+        <div class="grid-2 compact-grid">
+          <div class="section">
+            <label for="speedMode">速度模式</label>
+            <div class="select-shell ui-select">
+              <select id="speedMode" title="极速更快，精准更重视上下文">
+                <option value="fast">极速</option>
+                <option value="accurate">精准</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="section">
+            <label for="translationStyle">翻译风格</label>
+            <div class="select-shell ui-select">
+              <select id="translationStyle">
+                <option value="general">通用自然</option>
+                <option value="technical">技术文档</option>
+                <option value="business">正式商务</option>
+                <option value="casual">自然口语</option>
+                <option value="academic">学术论文</option>
+                <option value="product">产品介绍</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="separator" role="separator" aria-orientation="horizontal"></div>
+
+        <div class="grid-2 options-grid">
+          <div class="section toggle-section" aria-label="效率选项">
+            <label class="switch-row">
+              <span>启用缓存</span>
+              <input id="enableCache" class="switch-input" type="checkbox">
+              <span class="switch-control" aria-hidden="true"></span>
+            </label>
+            <label class="switch-row">
+              <span>划词按钮</span>
+              <input id="showSelectionButton" class="switch-input" type="checkbox">
+              <span class="switch-control" aria-hidden="true"></span>
+            </label>
+          </div>
+          <div class="section toggle-section" aria-label="准确率选项">
+            <label class="switch-row">
+              <span>自动术语表</span>
+              <input id="enableGlossaryExtraction" class="switch-input" type="checkbox">
+              <span class="switch-control" aria-hidden="true"></span>
+            </label>
+            <label class="switch-row">
+              <span>页面摘要</span>
+              <input id="enablePageSummary" class="switch-input" type="checkbox">
+              <span class="switch-control" aria-hidden="true"></span>
+            </label>
+          </div>
         </div>
       </section>
 
       <div class="actions" aria-label="翻译操作">
-        <button id="saveSettings" class="secondary action-button" type="button">
+        <button id="saveSettings" class="secondary action-button" type="button" title="保存当前服务、语言、术语和风格设置" aria-label="保存当前设置">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M20 6 9 17l-5-5"></path>
           </svg>
-          <span>保存</span>
+          <span>保存设置</span>
         </button>
-        <button id="translateSelection" class="secondary action-button" type="button">
+        <button id="translateSelection" class="secondary action-button" type="button" title="翻译当前网页中已选中的文字" aria-label="翻译选中文本">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 7h16"></path>
             <path d="M8 12h8"></path>
             <path d="M6 17h12"></path>
           </svg>
-          <span>选中</span>
+          <span>翻译选中</span>
         </button>
-        <button id="translatePage" class="primary action-button" type="button">
+        <button id="translatePage" class="primary action-button" type="button" title="翻译当前网页可读文本" aria-label="翻译当前页面">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M5 8h8"></path>
             <path d="M9 4v4c0 4-2 7-5 9"></path>
@@ -121,6 +194,7 @@
 
       <p class="status" id="status" role="status"></p>
     </main>
+    <script src="shared.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>
