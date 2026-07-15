@@ -777,8 +777,16 @@ async function translateSingleItemAfterBatchMismatch(settings, payload, item) {
 }
 
 function ensureReady(settings) {
+  if (settings.modelConfigValidationStatus === "validating") {
+    throw new Error("当前模型正在核验，请稍后再试。");
+  }
+
+  if (settings.modelConfigValidationStatus === "invalid") {
+    throw new Error(settings.modelConfigValidationMessage || "当前模型配置核验失败，请检查 API Key、模型和接口地址。");
+  }
+
   if (!isApiKeyOptionalProvider(settings) && (!settings.apiKey || !settings.apiKey.trim())) {
-    throw new Error(`请先填写 ${settings.resolvedProvider || settings.provider} 的 API 密钥。`);
+    throw new Error(`请先填写 ${getProviderLabel(settings.resolvedProvider || settings.provider)}的 API 密钥。`);
   }
 
   if (!settings.endpoint || !settings.endpoint.trim()) {
@@ -919,6 +927,7 @@ function buildBatchMessages(settings, payload) {
   const targetLanguage = payload?.targetLanguage || settings.targetLanguage;
   const speedMode = getSpeedMode(settings, payload);
   const pageContext = compactPageContext(payload?.pageContext || {}, getContextLimits("batch", speedMode));
+  const pageProfile = compactPageProfile(payload?.pageProfile || payload?.pageContext?.pageProfile || {});
   const glossary = payload?.glossary || settings.glossary || "";
   const styleInstruction = getTranslationStyleInstruction(payload?.translationStyle || settings.translationStyle);
   const shouldMarkUncertainty = speedMode !== "fast";
@@ -938,7 +947,7 @@ function buildBatchMessages(settings, payload) {
         styleInstruction,
         speedMode === "fast"
           ? "Prioritize low latency and concise translations while preserving the exact meaning."
-          : "Use page title, metadata, headings, page summary, confirmed glossary, page text sample, and nearby section labels to resolve ambiguous terms.",
+          : "Use page title, metadata, headings, page profile, page summary, confirmed glossary, page text sample, and nearby section labels to resolve ambiguous terms.",
         "Preserve product names, proper nouns, numbers, URLs, code-like tokens, and UI placeholders unless translation is clearly required.",
         "Keep each translation concise enough to fit back into the original web page.",
         shouldMarkUncertainty
@@ -954,6 +963,7 @@ function buildBatchMessages(settings, payload) {
           targetLanguage,
           glossary,
           pageContext,
+          pageProfile,
           items
         },
         null,
@@ -967,6 +977,7 @@ function buildSingleItemMessages(settings, payload, item) {
   const targetLanguage = payload?.targetLanguage || settings.targetLanguage;
   const speedMode = getSpeedMode(settings, payload);
   const pageContext = compactPageContext(payload?.pageContext || {}, getContextLimits("single", speedMode));
+  const pageProfile = compactPageProfile(payload?.pageProfile || payload?.pageContext?.pageProfile || {});
   const glossary = payload?.glossary || settings.glossary || "";
   const styleInstruction = getTranslationStyleInstruction(payload?.translationStyle || settings.translationStyle);
 
@@ -988,6 +999,7 @@ function buildSingleItemMessages(settings, payload, item) {
           targetLanguage,
           glossary,
           pageContext,
+          pageProfile,
           item: {
             text: item.text,
             tag: item.tag,
@@ -1005,6 +1017,7 @@ function buildSelectionMessages(settings, payload) {
   const targetLanguage = payload?.targetLanguage || settings.targetLanguage;
   const speedMode = getSpeedMode(settings, payload);
   const pageContext = compactPageContext(payload?.pageContext || {}, getContextLimits("selection", speedMode));
+  const pageProfile = compactPageProfile(payload?.pageProfile || payload?.pageContext?.pageProfile || {});
   const glossary = payload?.glossary || settings.glossary || "";
   const styleInstruction = getTranslationStyleInstruction(payload?.translationStyle || settings.translationStyle);
 
@@ -1026,6 +1039,7 @@ function buildSelectionMessages(settings, payload) {
           targetLanguage,
           glossary,
           pageContext,
+          pageProfile,
           selectedText: payload?.text || ""
         },
         null,
@@ -1037,6 +1051,7 @@ function buildSelectionMessages(settings, payload) {
 
 function buildGlossaryMessages(settings, payload) {
   const pageContext = payload?.pageContext || {};
+  const pageProfile = compactPageProfile(payload?.pageProfile || pageContext.pageProfile || {});
   const targetLanguage = payload?.targetLanguage || settings.targetLanguage;
   const existingGlossary = payload?.glossary || settings.glossary || "";
   const styleInstruction = getTranslationStyleInstruction(payload?.translationStyle || settings.translationStyle);
@@ -1070,6 +1085,7 @@ function buildGlossaryMessages(settings, payload) {
             openGraphTitle: pageContext.openGraphTitle,
             openGraphDescription: pageContext.openGraphDescription,
             headings: Array.isArray(pageContext.headings) ? pageContext.headings.slice(0, 60) : [],
+            pageProfile,
             pageTextSample: String(pageContext.pageTextSample || "").slice(0, glossarySampleLimit)
           }
         },
@@ -1115,6 +1131,36 @@ function compactPageContext(pageContext = {}, limits = {}) {
     glossaryTerms: Array.isArray(pageContext.glossaryTerms) ? pageContext.glossaryTerms.slice(0, termsLimit) : [],
     pageTextSample: textLimit > 0 ? String(pageContext.pageTextSample || "").slice(0, textLimit) : ""
   };
+}
+
+function compactPageProfile(profile = {}) {
+  if (!profile || !profile.version) {
+    return {};
+  }
+
+  return {
+    pageType: String(profile.pageType || ""),
+    complexity: String(profile.complexity || ""),
+    isReaderable: profile.isReaderable === true,
+    readabilitySource: String(profile.readabilitySource || ""),
+    totalTextChars: numberOrZero(profile.totalTextChars),
+    translatableNodeCount: numberOrZero(profile.translatableNodeCount),
+    articleCharCount: numberOrZero(profile.articleCharCount),
+    headingCount: numberOrZero(profile.headingCount),
+    paragraphCount: numberOrZero(profile.paragraphCount),
+    codeBlockCount: numberOrZero(profile.codeBlockCount),
+    tableCount: numberOrZero(profile.tableCount),
+    linkDensity: numberOrZero(profile.linkDensity),
+    codeDensity: numberOrZero(profile.codeDensity),
+    technicalScore: numberOrZero(profile.technicalScore),
+    dominantScript: String(profile.dominantScript || ""),
+    keywordHits: Array.isArray(profile.keywordHits) ? profile.keywordHits.slice(0, 10) : []
+  };
+}
+
+function numberOrZero(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
 }
 
 function parseJsonFromModel(content) {
@@ -1209,6 +1255,7 @@ function createCacheEntry(translation, settings, options = {}) {
     uncertainty: options.uncertainty || "",
     provider: settings.resolvedProvider || settings.provider,
     model: settings.model,
+    modelConfigId: settings.modelConfigId || "",
     site: normalizeHost(pageContext.url || ""),
     url: pageContext.url || "",
     createdAt: now,
