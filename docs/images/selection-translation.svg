@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="620" viewBox="0 0 1100 620" role="img" aria-labelledby="title desc">
+  <title id="title">划词翻译界面预览</title>
+  <desc id="desc">网页正文中选中一段英文，点击浮动翻译按钮后，在右侧看到译文、原文和备注。</desc>
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="150%" height="160%">
+      <feDropShadow dx="0" dy="14" stdDeviation="20" flood-color="#0f172a" flood-opacity="0.14"/>
+    </filter>
+    <style>
+      .ui { font-family: "Segoe UI", "Microsoft YaHei", Arial, sans-serif; }
+      .body { font-family: Georgia, "Times New Roman", serif; fill: #334155; font-size: 22px; }
+    </style>
+  </defs>
+  <rect width="1100" height="620" fill="#eef2f7"/>
+  <rect x="32" y="32" width="1036" height="556" rx="18" fill="#ffffff" filter="url(#shadow)"/>
+  <rect x="32" y="32" width="1036" height="58" rx="18" fill="#f8fafc"/>
+  <rect x="32" y="72" width="1036" height="18" fill="#f8fafc"/>
+  <circle cx="64" cy="61" r="8" fill="#f87171"/>
+  <circle cx="88" cy="61" r="8" fill="#fbbf24"/>
+  <circle cx="112" cy="61" r="8" fill="#34d399"/>
+  <rect x="174" y="46" width="546" height="30" rx="15" fill="#ffffff" stroke="#dbe3ed"/>
+  <text x="196" y="67" class="ui" font-size="15" fill="#64748b">example.com/technical-documentation</text>
+
+  <g transform="translate(76 132)">
+    <text x="0" y="0" class="ui" font-size="18" font-weight="700" fill="#2563eb">DOCUMENTATION</text>
+    <text x="0" y="56" class="ui" font-size="38" font-weight="760" fill="#0f172a">Build faster with contextual APIs</text>
+    <text x="0" y="108" class="body">The client preserves document structure and sends</text>
+    <rect x="-5" y="126" width="573" height="38" rx="5" fill="#dbeafe"/>
+    <text x="0" y="153" class="body" fill="#1e3a8a">surrounding context with every translation request.</text>
+    <text x="0" y="198" class="body">Terminology remains consistent across long pages,</text>
+    <text x="0" y="238" class="body">while cached paragraphs return without a new request.</text>
+    <rect x="0" y="296" width="520" height="12" rx="6" fill="#e2e8f0"/>
+    <rect x="0" y="326" width="442" height="12" rx="6" fill="#e2e8f0"/>
+    <rect x="0" y="356" width="484" height="12" rx="6" fill="#e2e8f0"/>
+  </g>
+
+  <g class="ui">
+    <rect x="597" y="250" width="54" height="44" rx="11" fill="#2563eb" filter="url(#shadow)"/>
+    <text x="624" y="280" text-anchor="middle" font-size="22" font-weight="750" fill="#ffffff">译</text>
+
+    <rect x="684" y="122" width="336" height="388" rx="16" fill="#ffffff" stroke="#cbd5e1" stroke-width="2" filter="url(#shadow)"/>
+    <rect x="684" y="122" width="336" height="52" rx="16" fill="#f8fafc"/>
+    <rect x="684" y="156" width="336" height="18" fill="#f8fafc"/>
+    <text x="708" y="155" font-size="20" font-weight="720" fill="#111827">划词翻译</text>
+    <text x="990" y="155" text-anchor="middle" font-size="24" fill="#64748b">×</text>
+
+    <text x="708" y="212" font-size="17" font-weight="720" fill="#2563eb">译文</text>
+    <text x="708" y="244" font-size="20" fill="#111827">客户端会保留文档结构，并在</text>
+    <text x="708" y="274" font-size="20" fill="#111827">每次翻译请求中携带周边语境。</text>
+
+    <line x1="708" y1="300" x2="996" y2="300" stroke="#e2e8f0"/>
+    <text x="708" y="334" font-size="17" font-weight="720" fill="#475569">原文</text>
+    <text x="708" y="366" font-size="17" fill="#334155">surrounding context with every</text>
+    <text x="708" y="392" font-size="17" fill="#334155">translation request.</text>
+
+    <line x1="708" y1="418" x2="996" y2="418" stroke="#e2e8f0"/>
+    <text x="708" y="452" font-size="17" font-weight="720" fill="#475569">备注</text>
+    <text x="708" y="482" font-size="16" fill="#64748b">context 根据技术文档语境译为“语境”。</text>
+  </g>
+</svg>
