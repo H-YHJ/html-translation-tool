@@ -11,15 +11,8 @@
   },
   "permissions": ["activeTab", "storage", "scripting", "contextMenus"],
   "host_permissions": [
-    "https://api.openai.com/*",
-    "https://*.openai.azure.com/*",
-    "https://api.deepseek.com/*",
-    "https://openrouter.ai/*",
-    "https://dashscope.aliyuncs.com/*",
-    "https://dashscope-us.aliyuncs.com/*",
-    "https://*.maas.aliyuncs.com/*",
-    "http://localhost/*",
-    "http://127.0.0.1/*"
+    "http://*/*",
+    "https://*/*"
   ],
   "action": {
     "default_icon": {
@@ -38,7 +31,7 @@
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["src/contentScript.js"],
+      "js": ["vendor/Readability-readerable.js", "vendor/Readability.js", "src/contentScript.js"],
       "run_at": "document_idle"
     }
   ]
