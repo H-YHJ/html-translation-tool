@@ -10,3 +10,6 @@ dist/
 **/*抖音*
 **/*xiaohongshu*
 **/*douyin*
+
+# Local implementation research
+docs/frontend-library-research.md
