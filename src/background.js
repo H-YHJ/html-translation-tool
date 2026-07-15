@@ -13,15 +13,25 @@ const CACHE_STORAGE_KEY = "contextTranslatorCache";
 const OPENROUTER_MODELS_KEY = "contextTranslatorOpenRouterModels";
 const MAX_CACHE_ENTRIES = 600;
 const API_TIMEOUT_MS = 45_000;
+const MODEL_VALIDATION_TIMEOUT_MS = 20_000;
 const API_MAX_RETRIES = 2;
 const MENU_TRANSLATE_SELECTION = "context-translator-translate-selection";
 
 const inFlightRequests = new Map();
+let modelValidationQueue = Promise.resolve();
 
 class BatchShapeError extends Error {
   constructor(message) {
     super(message);
     this.name = "BatchShapeError";
+  }
+}
+
+class ModelValidationError extends Error {
+  constructor(message, status = 0) {
+    super(message);
+    this.name = "ModelValidationError";
+    this.status = status;
   }
 }
 
@@ -67,7 +77,7 @@ async function sendMessageToTab(tabId, message) {
   } catch (error) {
     await chrome.scripting.executeScript({
       target: { tabId },
-      files: ["src/contentScript.js"]
+      files: ["vendor/Readability-readerable.js", "vendor/Readability.js", "src/contentScript.js"]
     });
     return chrome.tabs.sendMessage(tabId, message);
   }
@@ -102,12 +112,30 @@ async function handleMessage(message) {
     return refreshOpenRouterModels(message.payload);
   }
 
+  if (message.type === "VALIDATE_MODEL_CONFIG") {
+    return enqueueModelConfigValidation(message.payload);
+  }
+
   throw new Error(`不支持的请求：${message.type}`);
 }
 
+function enqueueModelConfigValidation(payload) {
+  const task = modelValidationQueue.then(() => validateModelConfig(payload));
+  modelValidationQueue = task.catch(() => undefined);
+  return task;
+}
+
 async function getSettings(payload = {}) {
-  const stored = await chrome.storage.local.get(DEFAULT_SETTINGS);
+  const stored = await chrome.storage.local.get(Object.keys(DEFAULT_SETTINGS));
   return resolveEffectiveSettings(normalizeSettings(stored), payload);
+}
+
+function getResolvedModelMeta(settings, source = {}) {
+  return {
+    provider: source.provider || settings.resolvedProvider || settings.provider,
+    model: source.model || settings.model || "",
+    modelConfigId: settings.modelConfigId || source.modelConfigId || ""
+  };
 }
 
 async function translateBatch(payload) {
@@ -116,7 +144,7 @@ async function translateBatch(payload) {
 
   const items = Array.isArray(payload?.items) ? payload.items : [];
   if (!items.length) {
-    return { translations: [], provider: settings.resolvedProvider || settings.provider };
+    return { translations: [], ...getResolvedModelMeta(settings) };
   }
 
   const cacheEnabled = payload?.enableCache !== false && settings.enableCache !== false;
@@ -171,7 +199,7 @@ async function translateBatch(payload) {
 
   return {
     translations,
-    provider: settings.resolvedProvider || settings.provider,
+    ...getResolvedModelMeta(settings),
     cached: cachedTranslations.size,
     fallbackItems
   };
@@ -198,7 +226,7 @@ async function translateSelection(payload) {
       return {
         translation: cached.translation,
         notes: cached.notes || "",
-        provider: cached.provider || settings.resolvedProvider || settings.provider,
+        ...getResolvedModelMeta(settings, cached),
         cached: 1
       };
     }
@@ -224,7 +252,7 @@ async function translateSelection(payload) {
   const response = {
     translation,
     notes,
-    provider: settings.resolvedProvider || settings.provider
+    ...getResolvedModelMeta(settings)
   };
 
   if (cacheEnabled && cacheKey) {
@@ -245,7 +273,7 @@ async function extractPageGlossary(payload = {}) {
 
   if (isMachineTranslationProvider(settings)) {
     return {
-      provider: settings.resolvedProvider || settings.provider,
+      ...getResolvedModelMeta(settings),
       summary: "",
       domain: "",
       terms: [],
@@ -264,7 +292,7 @@ async function extractPageGlossary(payload = {}) {
   const terms = normalizeGlossaryTerms(parsed?.terms);
 
   return {
-    provider: settings.resolvedProvider || settings.provider,
+    ...getResolvedModelMeta(settings),
     summary: String(parsed.summary || "").trim(),
     domain: String(parsed.domain || "").trim(),
     terms,
@@ -352,6 +380,190 @@ async function refreshOpenRouterModels(payload = {}) {
 
     throw error;
   }
+}
+
+async function validateModelConfig(payload = {}) {
+  const configId = String(payload.configId || "").trim();
+  if (!configId) {
+    throw new Error("缺少要核验的模型配置。");
+  }
+
+  const stored = await chrome.storage.local.get(Object.keys(DEFAULT_SETTINGS));
+  const settings = normalizeSettings(stored);
+  const config = settings.modelConfigs.find((item) => item.id === configId);
+  if (!config) {
+    throw new Error("找不到要核验的模型配置。");
+  }
+
+  await persistModelValidation(config, {
+    validationStatus: "validating",
+    validationMessage: "正在核验 API Key 与模型...",
+    validatedAt: 0
+  });
+
+  let result;
+  try {
+    result = await probeModelConfig(config);
+  } catch (error) {
+    result = {
+      validationStatus: "invalid",
+      validationMessage: formatModelValidationError(error, config.apiKey),
+      validatedAt: Date.now()
+    };
+  }
+
+  const persisted = await persistModelValidation(config, result);
+  if (persisted.stale) {
+    return {
+      configId,
+      validationStatus: "untested",
+      validationMessage: "配置已发生变化，请重新核验。",
+      validatedAt: 0,
+      stale: true
+    };
+  }
+
+  return {
+    configId,
+    validationStatus: result.validationStatus,
+    validationMessage: result.validationMessage,
+    validatedAt: result.validatedAt
+  };
+}
+
+async function persistModelValidation(expectedConfig, patch) {
+  const stored = await chrome.storage.local.get(Object.keys(DEFAULT_SETTINGS));
+  const settings = normalizeSettings(stored);
+  const index = settings.modelConfigs.findIndex((item) => item.id === expectedConfig.id);
+  const current = settings.modelConfigs[index];
+
+  if (index < 0 || !sameModelConfigCredentials(current, expectedConfig)) {
+    return { stale: true };
+  }
+
+  const modelConfigs = settings.modelConfigs.map((config, configIndex) => (
+    configIndex === index ? { ...config, ...patch } : config
+  ));
+  await chrome.storage.local.set({ modelConfigs });
+  return { stale: false };
+}
+
+function sameModelConfigCredentials(left, right) {
+  return Boolean(left && right
+    && left.id === right.id
+    && left.model === right.model
+    && left.endpoint === right.endpoint
+    && left.apiKey === right.apiKey);
+}
+
+async function probeModelConfig(config) {
+  const endpoint = parseValidationEndpoint(config.endpoint);
+  const headers = {
+    Authorization: `Bearer ${config.apiKey}`,
+    ...getProviderHeaders(config.provider)
+  };
+  return probeChatCompletion(config, endpoint, headers);
+}
+
+async function probeChatCompletion(config, endpoint, authHeaders) {
+  const requestBody = {
+    model: config.model,
+    messages: [{ role: "user", content: "Reply only with OK." }],
+    temperature: 0,
+    max_tokens: 1,
+    stream: false
+  };
+  let response = await sendModelValidationRequest(endpoint, authHeaders, requestBody);
+
+  if (!response.ok && response.status === 400 && /max_tokens|temperature/i.test(response.text)) {
+    response = await sendModelValidationRequest(endpoint, authHeaders, {
+      model: config.model,
+      messages: requestBody.messages,
+      stream: false
+    });
+  }
+
+  if (!response.ok) {
+    throw createModelValidationHttpError(response.status, response.text);
+  }
+
+  return {
+    validationStatus: "valid",
+    validationMessage: "配置成功，API Key 与模型兼容。",
+    validatedAt: Date.now()
+  };
+}
+
+async function sendModelValidationRequest(endpoint, authHeaders, body) {
+  const response = await fetchWithTimeout(endpoint.href, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders
+    },
+    body: JSON.stringify(body)
+  }, MODEL_VALIDATION_TIMEOUT_MS);
+
+  return {
+    ok: response.ok,
+    status: response.status,
+    text: await response.text()
+  };
+}
+
+function parseValidationEndpoint(endpoint) {
+  let url;
+  try {
+    url = new URL(String(endpoint || "").trim());
+  } catch (error) {
+    throw new ModelValidationError("接口地址格式不正确。");
+  }
+
+  if (!/^https?:$/.test(url.protocol)) {
+    throw new ModelValidationError("接口地址只支持 HTTP 或 HTTPS。");
+  }
+
+  return url;
+}
+
+function createModelValidationHttpError(status, responseText) {
+  const apiMessage = extractApiErrorMessage(responseText);
+  const message = {
+    400: apiMessage ? `请求不兼容：${apiMessage}` : "请求格式与该模型不兼容。",
+    401: "API Key 无效或已过期。",
+    403: "API Key 没有访问该模型的权限。",
+    404: "接口地址或模型名称不存在。",
+    408: "核验请求超时。",
+    429: "请求频率受限、额度不足或账户不可用。"
+  }[status] || (apiMessage ? `接口返回错误：${apiMessage}` : `接口核验失败（HTTP ${status || "未知"}）。`);
+
+  return new ModelValidationError(message, status);
+}
+
+function extractApiErrorMessage(responseText) {
+  try {
+    const data = JSON.parse(String(responseText || ""));
+    return trimForMessage(data?.error?.message || data?.message || data?.error || "");
+  } catch (error) {
+    return trimForMessage(responseText);
+  }
+}
+
+function formatModelValidationError(error, apiKey = "") {
+  if (error?.name === "AbortError" || Number(error?.status) === 408) {
+    return "配置失败：核验请求超时。";
+  }
+  if (error instanceof TypeError) {
+    return "配置失败：无法连接接口，请检查地址、网络或跨域权限。";
+  }
+
+  const message = String(error?.message || error || "核验失败。").trim();
+  return redactValidationSecret(`配置失败：${message}`, apiKey).slice(0, 300);
+}
+
+function redactValidationSecret(message, apiKey) {
+  const secret = String(apiKey || "").trim();
+  return secret ? String(message).split(secret).join("[API Key 已隐藏]") : String(message);
 }
 
 async function translateBatchWithMachineTranslation(settings, payload, items) {
