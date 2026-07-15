@@ -50,15 +50,20 @@
       apiKeyRequired: false
     },
     custom: {
-      label: "自定义接口",
+      label: "自定义兼容接口",
       endpoint: "",
       model: "",
       apiKeyRequired: true
     }
   };
 
+  const SELECTABLE_PROVIDERS = new Set(["auto", "custom"]);
+  const SETTINGS_SCHEMA_VERSION = 3;
+  const MODEL_CONFIG_STATUSES = new Set(["untested", "validating", "valid", "invalid"]);
+
   const DEFAULT_SETTINGS = {
-    provider: "auto",
+    settingsSchemaVersion: SETTINGS_SCHEMA_VERSION,
+    provider: "custom",
     apiKey: "",
     apiKeys: {
       deepseek: "",
@@ -68,8 +73,10 @@
       libretranslate: "",
       custom: ""
     },
-    endpoint: PROVIDERS.deepseek.endpoint,
-    model: PROVIDERS.deepseek.model,
+    endpoint: "",
+    model: "",
+    modelConfigs: [],
+    activeModelConfigId: "",
     targetLanguage: "简体中文",
     glossary: "",
     temperature: 0.1,
@@ -136,12 +143,23 @@
   };
 
   function normalizeSettings(stored = {}) {
-    const provider = PROVIDERS[stored.provider] ? stored.provider : DEFAULT_SETTINGS.provider;
-    const preset = PROVIDERS[provider] || PROVIDERS.auto;
+    const storedSchemaVersion = Number(stored.settingsSchemaVersion || 0);
+    const shouldResetInheritedModel = storedSchemaVersion < 1;
+    const shouldResetUnpairedEndpoint = storedSchemaVersion < 1
+      || (storedSchemaVersion < 2 && !String(stored.model || "").trim());
+    const storedProvider = PROVIDERS[stored.provider] ? stored.provider : DEFAULT_SETTINGS.provider;
+    const isLegacyProvider = !SELECTABLE_PROVIDERS.has(storedProvider);
+    const provider = isLegacyProvider ? "custom" : storedProvider;
+    const sourcePreset = PROVIDERS[storedProvider] || PROVIDERS.custom;
+    const preset = isLegacyProvider ? sourcePreset : PROVIDERS[provider] || PROVIDERS.custom;
     const apiKeys = { ...DEFAULT_SETTINGS.apiKeys, ...(stored.apiKeys || {}) };
 
-    if (stored.apiKey && provider !== "auto" && !apiKeys[provider]) {
-      apiKeys[provider] = stored.apiKey;
+    if (stored.apiKey && storedProvider !== "auto" && !apiKeys[storedProvider]) {
+      apiKeys[storedProvider] = stored.apiKey;
+    }
+
+    if (isLegacyProvider) {
+      apiKeys.custom = apiKeys[storedProvider] || stored.apiKey || apiKeys.custom || "";
     }
 
     const endpoint = provider === "auto"
@@ -152,16 +170,50 @@
       : DEFAULT_SETTINGS.model;
     const storedModel = provider === "auto"
       ? stored.model || DEFAULT_SETTINGS.model
-      : stored.model ?? defaultModel;
+      : isLegacyProvider
+        ? stored.model || defaultModel
+        : stored.model ?? defaultModel;
+    const legacyEndpoint = shouldResetUnpairedEndpoint ? "" : String(endpoint || "").trim();
+    const legacyModel = shouldResetInheritedModel
+      ? ""
+      : migrateModel(isLegacyProvider ? storedProvider : provider, storedModel);
+    const hasStoredModelConfigs = Array.isArray(stored.modelConfigs);
+    const modelConfigs = normalizeModelConfigs(hasStoredModelConfigs ? stored.modelConfigs : []);
+
+    if (!hasStoredModelConfigs && storedSchemaVersion < SETTINGS_SCHEMA_VERSION) {
+      modelConfigs.push(...buildLegacyModelConfigs({
+        storedProvider,
+        apiKeys,
+        endpoint: legacyEndpoint,
+        model: legacyModel
+      }));
+    }
+
+    const dedupedModelConfigs = dedupeModelConfigs(modelConfigs);
+    const requestedActiveId = String(stored.activeModelConfigId || "").trim();
+    const requestedActive = dedupedModelConfigs.find((config) => config.id === requestedActiveId);
+    const legacyActive = dedupedModelConfigs.find((config) => (
+      config.provider === storedProvider
+      || (config.model === legacyModel && config.endpoint === legacyEndpoint)
+    ));
+    const activeConfig = requestedActive || legacyActive || dedupedModelConfigs[0] || null;
+    const activeModelConfigId = activeConfig?.id || "";
+
+    if (activeConfig) {
+      apiKeys.custom = activeConfig.apiKey;
+    }
 
     return {
       ...DEFAULT_SETTINGS,
       ...stored,
       apiKeys,
       provider,
-      apiKey: provider === "auto" ? "" : apiKeys[provider] || "",
-      endpoint,
-      model: migrateModel(provider, storedModel),
+      apiKey: provider === "auto" ? "" : activeConfig?.apiKey || apiKeys[provider] || "",
+      endpoint: activeConfig?.endpoint || legacyEndpoint,
+      model: activeConfig?.model || legacyModel,
+      modelConfigs: dedupedModelConfigs,
+      activeModelConfigId,
+      settingsSchemaVersion: SETTINGS_SCHEMA_VERSION,
       targetLanguage: migrateLanguage(stored.targetLanguage || DEFAULT_SETTINGS.targetLanguage),
       speedMode: normalizeSpeedMode(stored.speedMode),
       translationStyle: normalizeTranslationStyle(stored.translationStyle),
