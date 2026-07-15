@@ -6,7 +6,7 @@
     <title>上下文翻译助手</title>
     <link rel="stylesheet" href="popup.css">
   </head>
-  <body data-provider="auto">
+  <body data-provider="custom">
     <main class="shell">
       <header class="app-header">
         <div class="brand">
@@ -18,10 +18,14 @@
             <p>先理解网页语境，再翻译正文。</p>
           </div>
         </div>
-        <button class="icon-button" id="restorePage" title="恢复原文" aria-label="恢复原文" type="button">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
+        <button class="icon-button" id="restorePage" data-action="show-original" data-available="false" title="暂无可切换的译文" aria-label="暂无可切换的译文" type="button" disabled>
+          <svg class="restore-original-icon" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M3 7v6h6"></path>
             <path d="M21 17a9 9 0 0 0-15-6.7L3 13"></path>
+          </svg>
+          <svg class="restore-translation-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M21 7v6h-6"></path>
+            <path d="M3 17a9 9 0 0 1 15-6.7L21 13"></path>
           </svg>
         </button>
       </header>
@@ -33,13 +37,7 @@
             <div class="select-shell ui-select">
               <select id="provider">
                 <option value="auto">Auto</option>
-                <option value="deepseek">DeepSeek</option>
-                <option value="aliyun">阿里云百炼</option>
-                <option value="openai">OpenAI</option>
-                <option value="openrouter">OpenRouter</option>
-                <option value="chrome">Chrome 内置翻译</option>
-                <option value="libretranslate">LibreTranslate 本地</option>
-                <option value="custom">自定义兼容接口</option>
+                <option value="custom" selected>自定义兼容接口</option>
               </select>
             </div>
           </div>
@@ -51,11 +49,6 @@
                 <option>简体中文</option>
                 <option>繁体中文</option>
                 <option>英语</option>
-                <option>日语</option>
-                <option>韩语</option>
-                <option>德语</option>
-                <option>法语</option>
-                <option>西班牙语</option>
               </select>
             </div>
           </div>
@@ -64,6 +57,105 @@
         <div class="separator" role="separator" aria-orientation="horizontal"></div>
 
         <div class="provider-config" data-provider-config>
+          <div class="grid-2">
+            <div class="section">
+              <div class="field-label-row">
+                <label id="modelLabel" for="model">模型</label>
+                <span id="modelConfiguredBadge" class="configured-badge" hidden>已配置</span>
+              </div>
+              <div class="model-field">
+                <input id="model" type="text" autocomplete="off">
+                <button id="toggleModelPicker" class="model-picker-trigger" type="button" aria-controls="modelPicker" aria-expanded="false" aria-label="选择常见模型" title="选择常见模型">
+                  <span class="assistant-select-chevron" aria-hidden="true"></span>
+                </button>
+                <div id="modelPicker" class="model-picker" role="dialog" aria-label="常见模型" hidden>
+                  <details class="model-group" data-endpoint="https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions">
+                    <summary>阿里云百炼</summary>
+                    <div class="model-options">
+                      <button class="model-option" type="button" data-model="qwen3.7-max">
+                        <span>Qwen 3.7 Max</span>
+                        <code>qwen3.7-max</code>
+                      </button>
+                      <button class="model-option" type="button" data-model="qwen3.7-plus">
+                        <span>Qwen 3.7 Plus</span>
+                        <code>qwen3.7-plus</code>
+                      </button>
+                      <button class="model-option" type="button" data-model="qwen3.6-flash">
+                        <span>Qwen 3.6 Flash</span>
+                        <code>qwen3.6-flash</code>
+                      </button>
+                      <button class="model-option" type="button" data-model="qwen3.6-plus">
+                        <span>Qwen 3.6 Plus</span>
+                        <code>qwen3.6-plus</code>
+                      </button>
+                    </div>
+                  </details>
+                  <details class="model-group" data-endpoint="https://api.deepseek.com/chat/completions">
+                    <summary>DeepSeek</summary>
+                    <div class="model-options">
+                      <button class="model-option" type="button" data-model="deepseek-v4-pro">
+                        <span>DeepSeek V4 Pro</span>
+                        <code>deepseek-v4-pro</code>
+                      </button>
+                      <button class="model-option" type="button" data-model="deepseek-v4-flash">
+                        <span>DeepSeek V4 Flash</span>
+                        <code>deepseek-v4-flash</code>
+                      </button>
+                    </div>
+                  </details>
+                  <details class="model-group" data-endpoint="https://api.openai.com/v1/chat/completions">
+                    <summary>OpenAI</summary>
+                    <div class="model-options">
+                      <button class="model-option" type="button" data-model="gpt-5.6">
+                        <span>GPT-5.6</span>
+                        <code>gpt-5.6</code>
+                      </button>
+                      <button class="model-option" type="button" data-model="gpt-5.6-terra">
+                        <span>GPT-5.6 Terra</span>
+                        <code>gpt-5.6-terra</code>
+                      </button>
+                      <button class="model-option" type="button" data-model="gpt-5.6-luna">
+                        <span>GPT-5.6 Luna</span>
+                        <code>gpt-5.6-luna</code>
+                      </button>
+                    </div>
+                  </details>
+                  <details class="model-group" data-endpoint="https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions">
+                    <summary>其他常见模型</summary>
+                    <div class="model-options">
+                      <button class="model-option" type="button" data-model="glm-5.2">
+                        <span>GLM 5.2</span>
+                        <code>glm-5.2</code>
+                      </button>
+                      <button class="model-option" type="button" data-model="kimi-k2.6">
+                        <span>Kimi K2.6</span>
+                        <code>kimi-k2.6</code>
+                      </button>
+                      <button class="model-option" type="button" data-model="MiniMax-M3">
+                        <span>MiniMax M3</span>
+                        <code>MiniMax-M3</code>
+                      </button>
+                    </div>
+                  </details>
+                  <div id="customModelEntry" class="custom-model-entry">
+                    <div class="custom-model-heading">
+                      <label for="customModelName">自定义模型名称</label>
+                      <span id="customModelConfiguredBadge" class="configured-badge" hidden>已配置</span>
+                    </div>
+                    <div class="custom-model-controls">
+                      <input id="customModelName" type="text" autocomplete="off" placeholder="请输入模型名称">
+                      <button id="applyCustomModel" type="button" disabled>使用</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="section">
+              <label for="endpoint">接口地址</label>
+              <input id="endpoint" type="url" autocomplete="off">
+            </div>
+          </div>
+
           <div class="section">
             <label id="apiKeyLabel" for="apiKey">API 密钥</label>
             <div class="secret-field">
@@ -83,24 +175,17 @@
             </div>
           </div>
 
-          <div class="grid-2">
-            <div class="section">
-              <label id="modelLabel" for="model">模型</label>
-              <div class="model-field">
-                <input id="model" type="text" autocomplete="off" list="openRouterModels">
-                <button id="refreshOpenRouterModels" class="icon-button field-icon" type="button" aria-label="刷新 OpenRouter 模型" title="刷新 OpenRouter 模型">
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M21 12a9 9 0 1 1-2.6-6.4"></path>
-                    <path d="M21 3v6h-6"></path>
-                  </svg>
-                </button>
-                <datalist id="openRouterModels"></datalist>
-              </div>
+          <div class="section model-config-library">
+            <div class="field-label-row">
+              <label id="modelConfigListLabel">模型配置</label>
+              <button id="addModelConfig" class="icon-button compact-icon-button" type="button" aria-label="新增模型配置" title="新增模型配置">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 5v14"></path>
+                  <path d="M5 12h14"></path>
+                </svg>
+              </button>
             </div>
-            <div class="section">
-              <label for="endpoint">接口地址</label>
-              <input id="endpoint" type="url" autocomplete="off">
-            </div>
+            <div id="modelConfigList" class="model-config-list" role="radiogroup" aria-labelledby="modelConfigListLabel"></div>
           </div>
         </div>
 
