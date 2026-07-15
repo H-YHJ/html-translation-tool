@@ -1278,7 +1278,23 @@ async function runTabAction(type, shouldSave = true) {
 
   try {
     if (shouldSave) {
-      await saveSettings();
+      const hasReadyAutoModel = settingsCache.modelConfigs.some((config) => (
+        config.enabled && config.validationStatus === "valid"
+      ));
+      const accurateAuto = controls.provider.value === "auto" && controls.speedMode.value === "accurate";
+      if (accurateAuto && !hasReadyAutoModel && modelValidationTasks.size) {
+        setStatus("正在核验已保存的模型配置...", "");
+        await startupValidationPromise;
+      }
+      await saveSettings({
+        saveModel: controls.provider.value === "custom",
+        validate: true,
+        silent: true
+      });
+    }
+
+    if (type === "TRANSLATE_PAGE" || type === "TRANSLATE_SELECTION") {
+      ensureSelectedModelIsReady(settingsCache);
     }
 
     const response = await sendToActiveTab({
@@ -1290,12 +1306,50 @@ async function runTabAction(type, shouldSave = true) {
       throw new Error(response?.error || "当前页面无法执行此操作。");
     }
 
+    if (type === "TRANSLATE_PAGE" || type === "RESTORE_PAGE") {
+      syncPageTranslationControl(response);
+    }
+
     setStatus(statusFor(type, response), "success");
   } catch (error) {
     setStatus(error.message || String(error), "error");
   } finally {
     setBusy(false);
   }
+}
+
+async function refreshPageTranslationState() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) {
+      syncPageTranslationControl();
+      return;
+    }
+
+    const response = await chrome.tabs.sendMessage(tab.id, {
+      type: "GET_PAGE_TRANSLATION_STATE"
+    });
+
+    syncPageTranslationControl(response?.ok ? response : null);
+  } catch (error) {
+    syncPageTranslationControl();
+  }
+}
+
+function syncPageTranslationControl(nextState = null) {
+  const hasTranslation = nextState?.hasTranslation === true;
+  const view = hasTranslation && nextState?.view === "translated" ? "translated" : "original";
+  const action = hasTranslation && view === "original" ? "show-translation" : "show-original";
+  const label = !hasTranslation
+    ? "暂无可切换的译文"
+    : action === "show-translation" ? "恢复译文" : "恢复原文";
+
+  pageTranslationState = { hasTranslation, view };
+  controls.restorePage.dataset.action = action;
+  controls.restorePage.dataset.available = String(hasTranslation);
+  controls.restorePage.title = label;
+  controls.restorePage.setAttribute("aria-label", label);
+  controls.restorePage.disabled = busy || !hasTranslation;
 }
 
 async function sendToActiveTab(message) {
@@ -1332,7 +1386,7 @@ async function ensureContentScript(tabId, force = false) {
         type: "PING_CONTEXT_TRANSLATOR"
       });
 
-      if (response?.ok || response?.ready) {
+      if ((response?.ok || response?.ready) && response.version === REQUIRED_CONTENT_SCRIPT_VERSION) {
         return;
       }
     } catch (error) {
@@ -1343,7 +1397,7 @@ async function ensureContentScript(tabId, force = false) {
   try {
     await chrome.scripting.executeScript({
       target: { tabId },
-      files: ["src/contentScript.js"]
+      files: ["vendor/Readability-readerable.js", "vendor/Readability.js", "src/contentScript.js"]
     });
   } catch (error) {
     throw new Error("无法在这个页面运行翻译脚本，请打开普通 http/https 网页后重试。");
@@ -1351,7 +1405,7 @@ async function ensureContentScript(tabId, force = false) {
 }
 
 function statusFor(type, response) {
-  const providerSuffix = formatProviderSuffix(response.provider);
+  const providerSuffix = formatProviderSuffix(response.provider, response.model);
   const cacheSuffix = formatCacheSuffix(response);
 
   if (type === "TRANSLATE_PAGE") {
@@ -1362,12 +1416,17 @@ function statusFor(type, response) {
     return `已翻译选中文本${providerSuffix}${cacheSuffix}。`;
   }
 
-  return "已恢复原文。";
+  if (!response.hasTranslation) {
+    return "当前页面还没有可切换的译文。";
+  }
+
+  return response.view === "translated" ? "已恢复译文。" : "已恢复原文。";
 }
 
-function formatProviderSuffix(provider) {
+function formatProviderSuffix(provider, model = "") {
   const label = getProviderLabel(provider);
-  return label ? `，使用 ${label}` : "";
+  const route = [label, String(model || "").trim()].filter(Boolean).join(" · ");
+  return route ? `，使用 ${route}` : "";
 }
 
 function formatCacheSuffix(response) {
@@ -1382,11 +1441,13 @@ function formatCacheSuffix(response) {
 }
 
 function setBusy(isBusy) {
+  busy = isBusy;
   controls.saveSettings.disabled = isBusy;
   controls.translatePage.disabled = isBusy;
   controls.translateSelection.disabled = isBusy;
-  controls.restorePage.disabled = isBusy;
-  controls.refreshOpenRouterModels.disabled = isBusy || controls.provider.value !== "openrouter";
+  controls.addModelConfig.disabled = isBusy || controls.provider.value === "auto";
+  controls.restorePage.disabled = isBusy || !pageTranslationState.hasTranslation;
+  renderModelConfigList();
 }
 
 function setStatus(message, tone = "") {
