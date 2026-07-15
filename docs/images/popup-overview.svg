@@ -2,6 +2,11 @@
   <title id="title">上下文翻译助手弹窗界面预览</title>
   <desc id="desc">展示翻译服务、目标语言、模型配置、术语偏好、速度模式、翻译风格和三个主要操作按钮。</desc>
   <defs>
+    <linearGradient id="previewIconOcean" x1="126" y1="82" x2="884" y2="934" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2AA8F5"/>
+      <stop offset="0.46" stop-color="#1778E8"/>
+      <stop offset="1" stop-color="#0B50BC"/>
+    </linearGradient>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
       <feDropShadow dx="0" dy="16" stdDeviation="22" flood-color="#0f172a" flood-opacity="0.12"/>
     </filter>
@@ -20,9 +25,16 @@
   <rect x="18" y="18" width="744" height="1064" rx="24" fill="#f8fafc" filter="url(#shadow)"/>
 
   <g class="ui">
-    <rect x="42" y="44" width="68" height="68" rx="16" fill="#2563eb"/>
-    <text x="76" y="91" text-anchor="middle" font-size="42" font-weight="800" fill="#ffffff">T</text>
-    <circle cx="99" cy="58" r="9" fill="#7dd3fc" stroke="#ffffff" stroke-width="4"/>
+    <g transform="translate(42 44) scale(0.06640625)">
+      <rect width="1024" height="1024" rx="230" fill="url(#previewIconOcean)"/>
+      <g fill="none" stroke="#F8FCFF" stroke-linecap="round" stroke-linejoin="round" stroke-width="98">
+        <path d="M382 278H330C278 278 244 320 244 372V652C244 704 278 746 330 746H382"/>
+        <path d="M642 278H694C746 278 780 320 780 372V652C780 704 746 746 694 746H642"/>
+      </g>
+      <rect x="356" y="422" width="312" height="78" rx="39" fill="#F8FCFF"/>
+      <path d="M395 558H512V636H395A39 39 0 0 1 356 597A39 39 0 0 1 395 558Z" fill="#F8FCFF"/>
+      <path d="M512 558H629A39 39 0 0 1 668 597A39 39 0 0 1 629 636H512Z" fill="#75F0D0"/>
+    </g>
     <text x="130" y="72" font-size="32" font-weight="760">上下文翻译助手</text>
     <text x="130" y="104" class="muted">先理解网页语境，再翻译正文。</text>
     <rect x="674" y="50" width="60" height="60" rx="16" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>

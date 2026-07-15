@@ -88,7 +88,7 @@ git clone https://github.com/H-YHJ/html-translation-tool.git
 
 ### 4. 固定到工具栏
 
-点击浏览器工具栏上的扩展图标，将**上下文翻译助手**固定到工具栏。之后点击蓝色 `T` 图标即可打开弹窗。
+点击浏览器工具栏上的扩展图标，将**上下文翻译助手**固定到工具栏。之后点击蓝色“语境窗口”图标即可打开弹窗。
 
 > [!IMPORTANT]
 > 修改扩展文件后，需要回到扩展管理页点击**重新加载**，并刷新已经打开的网页。否则可能看到 `Extension context invalidated.`。
