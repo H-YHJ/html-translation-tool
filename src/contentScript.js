@@ -44,6 +44,9 @@
   const MAX_BATCH_ITEMS = 32;
   const PAGE_CONTEXT_CHAR_LIMIT = 2200;
   const SELECTION_CHAR_LIMIT = 3000;
+  const READABILITY_TEXT_SAMPLE_LIMIT = 2400;
+  const PROFILE_TEXT_SAMPLE_LIMIT = 6000;
+  const PROFILE_KEYWORD_LIMIT = 16;
   const chromeTranslatorCache = new Map();
 
   const state = {
@@ -639,6 +642,306 @@
     }
 
     return normalizeText(document.body?.innerText || document.body?.textContent || "").slice(0, PAGE_CONTEXT_CHAR_LIMIT);
+  }
+
+  function buildPageProfile(pageContext = {}, textItems = [], options = {}) {
+    const task = options.task === "selection" ? "selection" : "page";
+    const readability = extractReadabilitySnapshot(options);
+    const translatableText = textItems.map((item) => item.text || "").join("\n").slice(0, PROFILE_TEXT_SAMPLE_LIMIT);
+    const contextText = [
+      pageContext.title,
+      pageContext.metaDescription,
+      pageContext.openGraphTitle,
+      pageContext.openGraphDescription,
+      Array.isArray(pageContext.headings) ? pageContext.headings.join(" ") : "",
+      readability.textSample,
+      pageContext.pageTextSample,
+      translatableText,
+      options.selectedText
+    ].filter(Boolean).join("\n").slice(0, PROFILE_TEXT_SAMPLE_LIMIT);
+    const totalTextChars = textItems.reduce((sum, item) => sum + String(item.text || "").length, 0);
+    const domStats = collectDomProfileStats(textItems, contextText);
+    const keywordHits = collectProfileKeywordHits(contextText);
+    const technicalScore = scoreTechnicalProfile(keywordHits, domStats);
+    const scriptProfile = getScriptProfile(contextText);
+    const pageType = classifyPageType({
+      task,
+      pageContext,
+      readability,
+      domStats,
+      technicalScore,
+      contextText
+    });
+    const complexity = classifyPageComplexity({
+      totalTextChars,
+      articleCharCount: readability.articleCharCount,
+      headingCount: domStats.headingCount,
+      technicalScore
+    });
+
+    return {
+      version: 1,
+      task,
+      urlHost: normalizeHost(pageContext.url || location.href),
+      isReaderable: readability.isReaderable,
+      readabilityUsed: readability.used,
+      readabilitySource: readability.source,
+      pageType,
+      complexity,
+      totalTextChars,
+      translatableNodeCount: textItems.length,
+      articleCharCount: readability.articleCharCount,
+      headingCount: domStats.headingCount,
+      paragraphCount: domStats.paragraphCount,
+      listItemCount: domStats.listItemCount,
+      tableCount: domStats.tableCount,
+      codeBlockCount: domStats.codeBlockCount,
+      formControlCount: domStats.formControlCount,
+      mediaCount: domStats.mediaCount,
+      linkDensity: domStats.linkDensity,
+      codeDensity: domStats.codeDensity,
+      technicalScore,
+      keywordHits,
+      dominantScript: scriptProfile.dominantScript,
+      cjkRatio: scriptProfile.cjkRatio,
+      latinRatio: scriptProfile.latinRatio,
+      numericRatio: scriptProfile.numericRatio,
+      titleLength: normalizeText(pageContext.title || "").length,
+      metaDescriptionLength: normalizeText(pageContext.metaDescription || "").length,
+      articleTitle: readability.title,
+      articleExcerpt: readability.excerpt
+    };
+  }
+
+  function extractReadabilitySnapshot(options = {}) {
+    const isReaderable = options.skipReadability ? false : isProbablyReadableDocument();
+    if (options.skipReadability || typeof Readability !== "function" || !isReaderable) {
+      return {
+        isReaderable,
+        used: false,
+        source: typeof Readability === "function" ? "readerable-check" : "unavailable",
+        title: "",
+        excerpt: "",
+        articleCharCount: 0,
+        textSample: ""
+      };
+    }
+
+    try {
+      const clone = document.cloneNode(true);
+      clone
+        .querySelectorAll("[data-context-translator-ignore]")
+        .forEach((element) => element.remove());
+
+      const article = new Readability(clone, {
+        charThreshold: 200,
+        maxElemsToParse: 7000,
+        serializer(element) {
+          return element?.textContent || "";
+        }
+      }).parse();
+      const text = normalizeText(article?.textContent || article?.content || "");
+
+      return {
+        isReaderable,
+        used: Boolean(article),
+        source: article ? "readability" : "readerable-check",
+        title: normalizeText(article?.title || "").slice(0, 160),
+        excerpt: normalizeText(article?.excerpt || "").slice(0, 280),
+        articleCharCount: text.length,
+        textSample: text.slice(0, READABILITY_TEXT_SAMPLE_LIMIT)
+      };
+    } catch (error) {
+      return {
+        isReaderable,
+        used: false,
+        source: "readability-error",
+        title: "",
+        excerpt: "",
+        articleCharCount: 0,
+        textSample: ""
+      };
+    }
+  }
+
+  function isProbablyReadableDocument() {
+    if (typeof isProbablyReaderable !== "function") {
+      return Boolean(document.querySelector("article, main, [role='main']"));
+    }
+
+    try {
+      return isProbablyReaderable(document, {
+        minScore: 14,
+        minContentLength: 120,
+        visibilityChecker(node) {
+          const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+          return isElementReadable(element);
+        }
+      });
+    } catch (error) {
+      return Boolean(document.querySelector("article, main, [role='main']"));
+    }
+  }
+
+  function collectDomProfileStats(textItems, contextText) {
+    const totalTextChars = textItems.reduce((sum, item) => sum + String(item.text || "").length, 0);
+    const linkTextChars = collectVisibleTextLength("a");
+    const codeTextChars = collectVisibleTextLength("pre, code, kbd, samp");
+    const profileTextChars = Math.max(1, totalTextChars || normalizeText(contextText).length);
+
+    return {
+      headingCount: Array.from(document.querySelectorAll("h1, h2, h3")).filter(isElementVisibleForProfile).length,
+      paragraphCount: Array.from(document.querySelectorAll("p, blockquote")).filter(isElementVisibleForProfile).length,
+      listItemCount: Array.from(document.querySelectorAll("li")).filter(isElementVisibleForProfile).length,
+      tableCount: Array.from(document.querySelectorAll("table")).filter(isElementVisibleForProfile).length,
+      codeBlockCount: Array.from(document.querySelectorAll("pre, code")).filter(isElementVisibleForProfile).length,
+      formControlCount: Array.from(document.querySelectorAll("input, textarea, select, button")).filter(isElementVisibleForProfile).length,
+      mediaCount: Array.from(document.querySelectorAll("img, video, picture, figure")).filter(isElementVisibleForProfile).length,
+      linkDensity: roundRatio(linkTextChars / Math.max(1, profileTextChars + linkTextChars)),
+      codeDensity: roundRatio(codeTextChars / Math.max(1, profileTextChars + codeTextChars))
+    };
+  }
+
+  function collectVisibleTextLength(selector) {
+    return Array.from(document.querySelectorAll(selector)).reduce((sum, element) => {
+      if (!isElementVisibleForProfile(element)) {
+        return sum;
+      }
+
+      return sum + normalizeText(element.innerText || element.textContent || "").length;
+    }, 0);
+  }
+
+  function isElementVisibleForProfile(element) {
+    if (!element || element.closest("[data-context-translator-ignore], [hidden], [aria-hidden='true']")) {
+      return false;
+    }
+
+    const style = window.getComputedStyle(element);
+    if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) {
+      return false;
+    }
+
+    const rect = element.getBoundingClientRect();
+    return rect.width !== 0 || rect.height !== 0;
+  }
+
+  function collectProfileKeywordHits(text) {
+    const patterns = [
+      ["api", /\bapi\b/i],
+      ["sdk", /\bsdk\b/i],
+      ["cli", /\bcli\b/i],
+      ["json", /\bjson\b/i],
+      ["html", /\bhtml\b/i],
+      ["css", /\bcss\b/i],
+      ["javascript", /\b(?:javascript|typescript|react|vue|node\.?js)\b/i],
+      ["python", /\bpython\b/i],
+      ["github", /\bgithub\b/i],
+      ["release", /\b(?:release|changelog|version)\b/i],
+      ["model", /\b(?:model|prompt|llm|ai)\b/i],
+      ["paper", /\b(?:abstract|paper|citation|references|arxiv)\b/i],
+      ["接口", /接口/],
+      ["代码", /代码|函数|参数|报错|错误|调试/],
+      ["文档", /文档|开发者|仓库|开源/],
+      ["产品", /产品|功能|定价|客户|方案/],
+      ["论文", /论文|摘要|引用|研究/]
+    ];
+    const hits = [];
+
+    for (const [label, pattern] of patterns) {
+      if (pattern.test(text)) {
+        hits.push(label);
+      }
+
+      if (hits.length >= PROFILE_KEYWORD_LIMIT) {
+        break;
+      }
+    }
+
+    return hits;
+  }
+
+  function scoreTechnicalProfile(keywordHits, domStats) {
+    const heavyKeywords = new Set(["api", "sdk", "cli", "json", "javascript", "python", "github", "接口", "代码", "文档"]);
+    const keywordScore = keywordHits.reduce((sum, keyword) => sum + (heavyKeywords.has(keyword) ? 2 : 1), 0);
+    const codeScore = Math.min(8, Math.round(domStats.codeDensity * 24) + Math.min(4, domStats.codeBlockCount));
+    return Math.min(20, keywordScore + codeScore);
+  }
+
+  function getScriptProfile(text) {
+    const source = String(text || "");
+    const cjkCount = (source.match(/[\u3400-\u9fff]/g) || []).length;
+    const latinCount = (source.match(/[a-z]/gi) || []).length;
+    const numericCount = (source.match(/\d/g) || []).length;
+    const total = Math.max(1, cjkCount + latinCount + numericCount);
+
+    return {
+      dominantScript: cjkCount > latinCount ? "cjk" : latinCount > 0 ? "latin" : "unknown",
+      cjkRatio: roundRatio(cjkCount / total),
+      latinRatio: roundRatio(latinCount / total),
+      numericRatio: roundRatio(numericCount / total)
+    };
+  }
+
+  function classifyPageType({ task, pageContext, readability, domStats, technicalScore, contextText }) {
+    if (task === "selection") {
+      return "selection";
+    }
+
+    if (technicalScore >= 7 || domStats.codeDensity >= 0.1) {
+      return "technical";
+    }
+
+    if (/\b(?:abstract|citation|references|arxiv|doi)\b|论文|摘要|引用|研究/i.test(contextText)) {
+      return "academic";
+    }
+
+    const title = normalizeText(pageContext.title || "");
+    const meta = normalizeText(pageContext.metaDescription || "");
+    const landingText = `${title} ${meta} ${contextText}`;
+    if (/\b(?:pricing|features|customers|enterprise|product|solution)\b|产品|功能|定价|客户|解决方案/i.test(landingText)) {
+      return "product";
+    }
+
+    if (readability.isReaderable && readability.articleCharCount >= 1200) {
+      return "article";
+    }
+
+    if (domStats.formControlCount >= 6 || domStats.linkDensity >= 0.42) {
+      return "app";
+    }
+
+    return domStats.paragraphCount >= 8 ? "article" : "general";
+  }
+
+  function classifyPageComplexity({ totalTextChars, articleCharCount, headingCount, technicalScore }) {
+    const effectiveChars = Math.max(Number(totalTextChars || 0), Number(articleCharCount || 0));
+    if (effectiveChars >= 8000 || headingCount >= 32 || technicalScore >= 12) {
+      return "large";
+    }
+
+    if (effectiveChars >= 1800 || headingCount >= 10 || technicalScore >= 5) {
+      return "medium";
+    }
+
+    return "small";
+  }
+
+  function normalizeHost(value) {
+    try {
+      return new URL(String(value || location.href)).host;
+    } catch (error) {
+      return "";
+    }
+  }
+
+  function roundRatio(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) {
+      return 0;
+    }
+
+    return Math.round(Math.max(0, Math.min(1, number)) * 1000) / 1000;
   }
 
   function collectTextItems() {
