@@ -1,5 +1,6 @@
 (() => {
-  const CONTENT_SCRIPT_INSTANCE = chrome.runtime?.id || "context-translator";
+  const CONTENT_SCRIPT_VERSION = "2026-07-15-auto-task-routing-v2";
+  const CONTENT_SCRIPT_INSTANCE = `${chrome.runtime?.id || "context-translator"}:${CONTENT_SCRIPT_VERSION}`;
 
   if (window.__contextTranslatorLoaded === CONTENT_SCRIPT_INSTANCE) {
     return;
@@ -27,7 +28,7 @@
   ].join(",");
 
   const DEFAULT_CONTENT_OPTIONS = {
-    provider: "auto",
+    provider: "custom",
     targetLanguage: "简体中文",
     glossary: "",
     speedMode: "accurate",
@@ -53,6 +54,7 @@
     translatedNodes: [],
     translatedNodeSet: new WeakSet(),
     translatedWrappers: [],
+    pageView: "original",
     selectionHighlights: [],
     toast: null,
     toastTimer: null,
@@ -174,12 +176,15 @@
     }
 
     if (message.type === "RESTORE_PAGE") {
-      restorePage();
-      return { restored: true };
+      return togglePageTranslation();
+    }
+
+    if (message.type === "GET_PAGE_TRANSLATION_STATE") {
+      return getPageTranslationState();
     }
 
     if (message.type === "PING_CONTEXT_TRANSLATOR") {
-      return { ready: true };
+      return { ready: true, version: CONTENT_SCRIPT_VERSION };
     }
 
     throw new Error(`不支持的操作：${message.type}`);
@@ -187,7 +192,7 @@
 
   async function translatePage(options) {
     const normalizedOptions = normalizeContentOptions({ ...state.contentOptions, ...options });
-    restorePage(false);
+    resetPageTranslation(false);
     showToast("正在读取页面结构...", "busy", 4);
 
     const pageContext = collectPageContext();
@@ -198,7 +203,8 @@
       return { translated: 0 };
     }
 
-    const glossaryResult = await prepareGlossaryBeforeTranslation(pageContext, textItems, normalizedOptions);
+    const pageProfile = buildPageProfile(pageContext, textItems, { task: "page" });
+    const glossaryResult = await prepareGlossaryBeforeTranslation(pageContext, textItems, normalizedOptions, pageProfile);
     const preparedOptions = {
       ...normalizedOptions,
       glossary: mergeGlossary(normalizedOptions.glossary, glossaryResult.glossaryText)
@@ -207,14 +213,17 @@
       ...pageContext,
       pageSummary: glossaryResult.summary || "",
       glossaryTerms: glossaryResult.terms || [],
-      uncertainties: glossaryResult.uncertainties || []
+      uncertainties: glossaryResult.uncertainties || [],
+      pageProfile
     };
 
     let completed = 0;
     let cached = 0;
     let fallbackItems = 0;
     let failed = 0;
-    let activeProvider = "";
+    let activeProvider = glossaryResult.provider || "";
+    let activeModel = glossaryResult.model || "";
+    let activeModelConfigId = glossaryResult.modelConfigId || "";
     const batches = createBatches(textItems, normalizedOptions);
 
     for (let batchIndex = 0; batchIndex < batches.length; batchIndex += 1) {
@@ -222,7 +231,13 @@
       const progress = 18 + Math.round((batchIndex / batches.length) * 82);
       showToast(`正在翻译 ${batchIndex + 1}/${batches.length}...`, "busy", progress);
 
-      const result = await translateBatchThroughBestEngine(batch, preparedOptions, preparedContext);
+      const result = await translateBatchThroughBestEngine(
+        batch,
+        preparedOptions,
+        preparedContext,
+        pageProfile,
+        activeModelConfigId
+      );
 
       if (!result?.ok) {
         failed += batch.length;
@@ -231,19 +246,24 @@
 
       applyTranslations(batch, result.translations || [], preparedOptions);
       activeProvider = result.provider || activeProvider;
+      activeModel = result.model || activeModel;
+      activeModelConfigId = result.modelConfigId || activeModelConfigId;
       cached += result.cached || 0;
       fallbackItems += result.fallbackItems || 0;
       completed += batch.length;
       showToast(`正在翻译 ${batchIndex + 1}/${batches.length}...`, "busy", 18 + Math.round(((batchIndex + 1) / batches.length) * 82));
     }
 
-    showToast(`已翻译 ${completed} 段文本${formatProviderSuffix(activeProvider)}${formatMetricSuffix(cached, fallbackItems)}${failed ? `，${failed} 段失败` : ""}。`, "success");
+    showToast(`已翻译 ${completed} 段文本${formatProviderSuffix(activeProvider, activeModel)}${formatMetricSuffix(cached, fallbackItems)}${failed ? `，${failed} 段失败` : ""}。`, "success");
     return {
       translated: completed,
       provider: activeProvider,
+      model: activeModel,
+      modelConfigId: activeModelConfigId,
       cached,
       fallbackItems,
-      failed
+      failed,
+      ...getPageTranslationState()
     };
   }
 
@@ -262,22 +282,29 @@
     showToast("正在翻译选中文本...", "busy");
 
     const pageContext = collectPageContext();
-    const result = await translateSelectionThroughBestEngine(text, normalizedOptions, pageContext);
+    const pageProfile = buildPageProfile(pageContext, [{ id: "selection", text, tag: "selection", section: "" }], {
+      task: "selection",
+      selectedText: text,
+      skipReadability: true
+    });
+    const result = await translateSelectionThroughBestEngine(text, normalizedOptions, pageContext, pageProfile);
 
     if (!result?.ok) {
       throw new Error(result?.error || "翻译失败。");
     }
 
     showSelectionPanel(text, result.translation, result.notes);
-    showToast(`选中文本已翻译${formatProviderSuffix(result.provider)}${formatMetricSuffix(result.cached || 0, 0)}。`, "success");
+    showToast(`选中文本已翻译${formatProviderSuffix(result.provider, result.model)}${formatMetricSuffix(result.cached || 0, 0)}。`, "success");
     return {
       translated: true,
       provider: result.provider,
+      model: result.model,
+      modelConfigId: result.modelConfigId,
       cached: result.cached || 0
     };
   }
 
-  async function translateBatchThroughBestEngine(batch, options, pageContext) {
+  async function translateBatchThroughBestEngine(batch, options, pageContext, pageProfile, preferredModelConfigId = "") {
     if (shouldUseChromeTranslator(options)) {
       try {
         return await translateBatchWithChromeTranslator(batch, options, pageContext);
@@ -291,7 +318,10 @@
     return sendRuntimeMessage({
       type: "TRANSLATE_BATCH",
       payload: {
+        taskType: "page",
+        preferredModelConfigId,
         pageContext,
+        pageProfile,
         items: batch.map(({ node, ...item }) => item),
         targetLanguage: options.targetLanguage,
         glossary: options.glossary,
@@ -302,7 +332,7 @@
     });
   }
 
-  async function translateSelectionThroughBestEngine(text, options, pageContext) {
+  async function translateSelectionThroughBestEngine(text, options, pageContext, pageProfile) {
     if (shouldUseChromeTranslator(options)) {
       try {
         const translation = await translateTextWithChromeTranslator(text.slice(0, SELECTION_CHAR_LIMIT), options, pageContext);
@@ -323,7 +353,9 @@
     return sendRuntimeMessage({
       type: "TRANSLATE_SELECTION",
       payload: {
+        taskType: "selection",
         pageContext,
+        pageProfile,
         text: text.slice(0, SELECTION_CHAR_LIMIT),
         targetLanguage: options.targetLanguage,
         glossary: options.glossary,
@@ -467,9 +499,9 @@
     return /^[a-z]{2,3}$/.test(base) ? base : "";
   }
 
-  async function prepareGlossaryBeforeTranslation(pageContext, textItems, options) {
-    if (!shouldPreparePageContext(pageContext, textItems, options)) {
-      return { terms: [], glossaryText: "", summary: "", uncertainties: [] };
+  async function prepareGlossaryBeforeTranslation(pageContext, textItems, options, pageProfile) {
+    if (!shouldPreparePageContext(pageContext, textItems, options, pageProfile)) {
+      return { terms: [], glossaryText: "", summary: "", uncertainties: [], provider: "", model: "", modelConfigId: "" };
     }
 
     showToast("正在分析网页语境...", "busy", 12);
@@ -477,7 +509,9 @@
     const result = await sendRuntimeMessage({
       type: "EXTRACT_PAGE_GLOSSARY",
       payload: {
+        taskType: "glossary",
         pageContext,
+        pageProfile,
         targetLanguage: options.targetLanguage,
         glossary: options.glossary,
         speedMode: options.speedMode,
@@ -486,14 +520,17 @@
     });
 
     if (!result?.ok) {
-      return { terms: [], glossaryText: "", summary: "", uncertainties: [] };
+      return { terms: [], glossaryText: "", summary: "", uncertainties: [], provider: "", model: "", modelConfigId: "" };
     }
 
     const payload = {
       terms: options.enableGlossaryExtraction && Array.isArray(result.terms) ? result.terms : [],
       summary: options.enablePageSummary ? result.summary || "" : "",
       domain: result.domain || "",
-      uncertainties: options.enableGlossaryExtraction && Array.isArray(result.uncertainties) ? result.uncertainties : []
+      uncertainties: options.enableGlossaryExtraction && Array.isArray(result.uncertainties) ? result.uncertainties : [],
+      provider: result.provider || "",
+      model: result.model || "",
+      modelConfigId: result.modelConfigId || ""
     };
 
     return {
@@ -502,7 +539,7 @@
     };
   }
 
-  function shouldPreparePageContext(pageContext, textItems, options) {
+  function shouldPreparePageContext(pageContext, textItems, options, pageProfile = {}) {
     if (isLocalTranslationProvider(options.provider)) {
       return false;
     }
@@ -515,7 +552,11 @@
       return false;
     }
 
-    const totalChars = textItems.reduce((sum, item) => sum + item.text.length, 0);
+    const totalChars = Number(pageProfile.totalTextChars || 0) || textItems.reduce((sum, item) => sum + item.text.length, 0);
+    const technicalScore = Number(pageProfile.technicalScore || 0);
+    const isDenseUi = pageProfile.pageType === "app" || Number(pageProfile.linkDensity || 0) > 0.38;
+    const isReaderableArticle = pageProfile.isReaderable && Number(pageProfile.articleCharCount || 0) >= 700;
+    const isComplexPage = pageProfile.complexity === "large" || pageProfile.complexity === "medium";
     const contextText = [
       pageContext.title,
       pageContext.metaDescription,
@@ -526,7 +567,11 @@
     ].filter(Boolean).join(" ");
     const looksTechnical = /\b(api|sdk|cli|json|xml|html|css|react|vue|typescript|javascript|python|github|npm|docs?|release|changelog|model|prompt)\b|接口|代码|函数|参数|报错|文档|开发|模型|术语|论文|产品/i.test(contextText);
 
-    return totalChars >= 900 || textItems.length >= 8 || looksTechnical;
+    if (isDenseUi && totalChars < 2400 && technicalScore < 4) {
+      return false;
+    }
+
+    return totalChars >= 900 || textItems.length >= 8 || looksTechnical || technicalScore >= 4 || isReaderableArticle || isComplexPage;
   }
 
   function normalizeSpeedMode(mode) {
@@ -548,18 +593,18 @@
     return [userGlossary, extractedGlossary].map((value) => String(value || "").trim()).filter(Boolean).join("\n");
   }
 
-  function formatProviderSuffix(provider) {
+  function formatProviderSuffix(provider, model = "") {
     const labels = {
-      deepseek: "，使用 DeepSeek",
-      aliyun: "，使用阿里云百炼",
-      openai: "，使用 OpenAI",
-      openrouter: "，使用 OpenRouter",
-      chrome: "，使用 Chrome 内置翻译",
-      libretranslate: "，使用 LibreTranslate 本地",
-      custom: "，使用自定义接口"
+      deepseek: "DeepSeek",
+      aliyun: "阿里云百炼",
+      openai: "OpenAI",
+      openrouter: "OpenRouter",
+      chrome: "Chrome 内置翻译",
+      libretranslate: "LibreTranslate 本地",
+      custom: "自定义兼容接口"
     };
-
-    return labels[provider] || "";
+    const route = [labels[provider] || provider, String(model || "").trim()].filter(Boolean).join(" · ");
+    return route ? `，使用 ${route}` : "";
   }
 
   function formatMetricSuffix(cached, fallbackItems) {
@@ -573,7 +618,58 @@
     return parts.length ? `，${parts.join("，")}` : "";
   }
 
-  function restorePage(showNotice = true) {
+  function getPageTranslationState() {
+    const hasTranslation = state.translatedNodes.some((record) => (
+      record.node?.isConnected && typeof record.translation === "string"
+    ));
+
+    return {
+      hasTranslation,
+      view: hasTranslation ? state.pageView : "original"
+    };
+  }
+
+  function togglePageTranslation(showNotice = true) {
+    const current = getPageTranslationState();
+    if (!current.hasTranslation) {
+      if (showNotice) {
+        showToast("当前页面还没有可切换的译文。", "error");
+      }
+      return { ...current, changed: false };
+    }
+
+    const nextView = current.view === "translated" ? "original" : "translated";
+    return setPageTranslationView(nextView, showNotice);
+  }
+
+  function setPageTranslationView(view, showNotice = true) {
+    const nextView = view === "translated" ? "translated" : "original";
+
+    for (const record of state.translatedNodes) {
+      if (record.node && record.node.isConnected) {
+        record.node.nodeValue = nextView === "translated" ? record.translation : record.original;
+      }
+    }
+
+    for (const wrapper of state.translatedWrappers) {
+      if (wrapper?.isConnected) {
+        wrapper.hidden = nextView !== "translated";
+      }
+    }
+
+    state.pageView = nextView;
+    hideSelectionPanel();
+    clearSelectionHighlight();
+    hideSelectionButton();
+
+    if (showNotice) {
+      showToast(nextView === "translated" ? "已恢复译文。" : "已恢复原文。", "success");
+    }
+
+    return { ...getPageTranslationState(), changed: true };
+  }
+
+  function resetPageTranslation(showNotice = false) {
     for (const record of state.translatedNodes) {
       if (record.node && record.node.isConnected) {
         record.node.nodeValue = record.original;
@@ -589,6 +685,7 @@
     state.translatedNodes = [];
     state.translatedWrappers = [];
     state.translatedNodeSet = new WeakSet();
+    state.pageView = "original";
     hideSelectionPanel();
     clearSelectionHighlight();
     hideSelectionButton();
@@ -1081,15 +1178,21 @@
   }
 
   function replaceTextNode(item, translation, uncertainty = "") {
+    let record = state.translatedNodes.find((candidate) => candidate.node === item.node);
+
     if (!state.translatedNodeSet.has(item.node)) {
-      state.translatedNodes.push({
+      record = {
         node: item.node,
-        original: item.node.nodeValue
-      });
+        original: item.node.nodeValue,
+        translation: ""
+      };
+      state.translatedNodes.push(record);
       state.translatedNodeSet.add(item.node);
     }
 
-    item.node.nodeValue = preserveOuterWhitespace(item.node.nodeValue || "", translation);
+    record.translation = preserveOuterWhitespace(record.original || "", translation);
+    item.node.nodeValue = record.translation;
+    state.pageView = "translated";
     if (uncertainty) {
       insertUncertaintyMarker(item.node, uncertainty);
     }
@@ -1330,6 +1433,15 @@
     }
   }
 
+  function hideToast() {
+    if (!state.toast) {
+      return;
+    }
+
+    window.clearTimeout(state.toastTimer);
+    state.toast.hidden = true;
+  }
+
   function normalizeToastProgress(progress) {
     if (!Number.isFinite(Number(progress))) {
       return null;
@@ -1349,7 +1461,8 @@
       .context-translator-panel,
       .context-translator-selection-button,
       .context-translator-selection-highlight,
-      .context-translator-uncertainty {
+      .context-translator-uncertainty,
+      .context-translator-toast-close {
         all: initial;
         box-sizing: border-box;
         font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
@@ -1364,7 +1477,7 @@
         gap: 8px;
         min-width: 172px;
         max-width: min(360px, calc(100vw - 36px));
-        padding: 11px 13px 10px;
+        padding: 11px 42px 10px 13px;
         border: 1px solid rgba(255, 255, 255, 0.76);
         border-radius: 14px;
         background: rgba(255, 255, 255, 0.82);
@@ -1375,11 +1488,43 @@
         line-height: 1.45;
       }
 
+      .context-translator-toast-row {
+        display: block;
+        min-width: 0;
+      }
+
       .context-translator-toast-message {
         display: block;
         min-width: 0;
         color: inherit;
         font: 13px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      }
+
+      .context-translator-toast-close {
+        position: absolute;
+        top: 8px;
+        right: 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        border: 1px solid rgba(100, 116, 139, 0.16);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.7);
+        color: #475569;
+        cursor: pointer;
+        font: 700 16px/1 Inter, ui-sans-serif, system-ui, sans-serif;
+        transition:
+          background-color 150ms ease,
+          color 150ms ease,
+          border-color 150ms ease;
+      }
+
+      .context-translator-toast-close:hover {
+        border-color: rgba(100, 116, 139, 0.28);
+        background: rgba(241, 245, 249, 0.92);
+        color: #111827;
       }
 
       .context-translator-toast-progress {
@@ -1543,11 +1688,19 @@
     toast.hidden = true;
     toast.dataset.contextTranslatorIgnore = "true";
     toast.innerHTML = `
-      <span class="context-translator-toast-message"></span>
+      <span class="context-translator-toast-row">
+        <span class="context-translator-toast-message"></span>
+        <button class="context-translator-toast-close" type="button" aria-label="关闭提示" title="关闭提示">×</button>
+      </span>
       <span class="context-translator-toast-progress" aria-hidden="true">
         <span class="context-translator-toast-progress-bar"></span>
       </span>
     `;
+    toast.querySelector(".context-translator-toast-close").addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      hideToast();
+    });
 
     document.documentElement.append(style, toast);
     state.toast = toast;
